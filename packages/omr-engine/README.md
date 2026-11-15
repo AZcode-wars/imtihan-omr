@@ -47,32 +47,20 @@ Keluaran `out/`:
 
 ## Batas halaman
 
-Dengan jarak antar pusat antar bubble minimal **8,5 mm** (PRD FR-1.2) dan
-halaman A4 210 × 297 mm, tidak semua kombinasi jumlah soal muat di satu
-halaman. `compute_layout()` mencari tata letak yang pas (memanfaatkan
-tinggi kotak jawaban esai dan jarak antar blok secara bertahap), dan melempar
-`TemplateOverflowError` dengan pesan yang bisa ditindaklanjuti bila tetap
-tidak muat.
+Dengan jarak antar pusat antar bubble **8,5 mm** (PRD FR-1.2), jeda pengelompokan
+5 nomor (+7 mm), dan halaman A4 210 × 297 mm, kapasitas satu halaman dibatasi:
 
-Kapasitas satu halaman (hasil implementasi):
-
-| Soal esai | PG maksimum |
+| Zona esai | PG maksimum |
 |---|---|
-| 0 | 50 |
-| 1 | 50 |
-| 2 | 50 |
-| 3 | 50 |
-| 4 | 50 |
-| 5 | 44 |
-| 6 | 38 |
-| 7 | 32 |
-| 8 | 26 |
-| 9 | 20 |
-| 10 | 14 |
+| Tanpa zona esai | **40** |
+| Dengan zona esai (satu kotak besar) | **30** |
 
-`max_essay_count_for(pg_count)` memberi tahu antarmuka berapa soal esai
-maksimum yang masih muat — dipakai layar `/setup` untuk memperingatkan guru
-**sebelum** mencetak.
+Karena zona esai kini **satu kotak besar**, jumlah soal esai tidak lagi mengubah
+tinggi area — yang menentukan adalah ada/tidaknya zona esai. Kombinasi melebihi
+batas melempar `TemplateOverflowError`.
+
+`max_pg_count_for(essay_count)` dan `max_essay_count_for(pg_count)` memberi tahu
+antarmuka batas yang masih muat sebelum guru mencetak.
 
 ## Catatan
 

@@ -15,7 +15,10 @@ from reportlab.pdfgen import canvas
 
 from .template import (
     CLASS_BOX_RECT_MM,
+    CONTENT_LEFT_MM,
+    ESSAY_AREA_GAP_MM,
     INSTRUCTION_BOX_RECT_MM,
+    INSTRUCTION_COLUMNS,
     INSTRUCTIONS,
     MC_SECTION_TITLE_Y_MM,
     NAME_CROP_RECT_MM,
@@ -134,10 +137,8 @@ def render_pdf(template: dict, path: str | Path) -> Path:
 
     crop = template["nameCropRectMm"]
     _dashed_rect(c, crop["x"], crop["y"], crop["w"], crop["h"])
-    _text(c, "NAMA", crop["x"] + 2, crop["y"] + 3, size_pt=5.5, color=FAINT)
-    _text(c, "KELAS", crop["x"] + 2, crop["y"] + 8, size_pt=5.5, color=FAINT)
-    _text(c, "________________________", crop["x"] + 16, crop["y"] + 3, size_pt=8)
-    _text(c, "________________________", crop["x"] + 16, crop["y"] + 8, size_pt=8)
+    _text(c, "NAMA", crop["x"] + 2, crop["y"] + 7, size_pt=5.5, color=FAINT)
+    _text(c, "________________________", crop["x"] + 16, crop["y"] + 7, size_pt=8)
 
     klass = CLASS_BOX_RECT_MM
     _dashed_rect(c, klass["x"], klass["y"], klass["w"], klass["h"])
@@ -146,36 +147,49 @@ def render_pdf(template: dict, path: str | Path) -> Path:
     _text(c, "____________", klass["x"] + 30, klass["y"] + 3, size_pt=8)
     _text(c, "____________", klass["x"] + 30, klass["y"] + 8, size_pt=8)
 
-    # --- Petunjuk pengisian (mengisi ruang kosong di kanan zona PG) ---
+    # --- Petunjuk pengisian (dipindah ke bawah kotak nama & kelas) ---
     guide = INSTRUCTION_BOX_RECT_MM
     _dashed_rect(c, guide["x"], guide["y"], guide["w"], guide["h"])
-    _text(c, "PETUNJUK", guide["x"] + 3, guide["y"] + 5, size_pt=6, color=FAINT)
+    _text(c, "PETUNJUK", guide["x"] + 3, guide["y"] + 4.5, size_pt=6, color=FAINT)
+    col_w = guide["w"] / INSTRUCTION_COLUMNS
     for i, line in enumerate(INSTRUCTIONS):
-        _text(c, f"- {line}", guide["x"] + 3, guide["y"] + 11 + i * 6, size_pt=6.5)
+        col = i % INSTRUCTION_COLUMNS
+        row = i // INSTRUCTION_COLUMNS
+        _text(
+            c,
+            f"- {line}",
+            guide["x"] + 3 + col * col_w,
+            guide["y"] + 9 + row * 4,
+            size_pt=6.5,
+        )
 
     # --- Pilihan Ganda ---
-    _text(c, "I. PILIHAN GANDA", 14, MC_SECTION_TITLE_Y_MM, size_pt=7.5)
+    _text(c, "I. PILIHAN GANDA", CONTENT_LEFT_MM, MC_SECTION_TITLE_Y_MM, size_pt=7.5)
     bubble_d = template["bubbleDiameterMm"]
     for slot in template["multipleChoiceSlots"]:
         _text(c, f"{slot['questionNumber']:02d}", slot["xMm"], slot["yMm"] + 1, size_pt=6, color=FAINT)
         for opt in slot["options"]:
             _circle(c, opt["xMm"], opt["yMm"], bubble_d)
 
-    # --- Zona esai: hanya area kosong jawaban siswa ---
-    # Tidak ada lingkaran skor: skor esai dinilai guru di aplikasi.
-    essay_slots = template["essaySlots"]
-    essay_top = min((s["yMm"] for s in essay_slots), default=0.0)
-    if essay_slots:
-        _text(c, "II. ZONA JAWABAN ESAI", 14, essay_top - 2, size_pt=7.5)
-    for slot in essay_slots:
-        rect = slot["studentAnswerRectMm"]
-        _text(c, f"E{slot['questionNumber']}", 14, rect["y"] + rect["h"] / 2, size_pt=7)
-        _dashed_rect(c, rect["x"], rect["y"], rect["w"], rect["h"])
+    # --- Zona esai: SATU kotak besar, tanpa nomor per soal ---
+    # Skor esai dinilai guru di aplikasi, jadi kertas tidak perlu lingkaran
+    # skor. Kotak ini hanya penanda zona esai; siswa menomori sendiri
+    # jawabannya, sehingga mesin cukup memotong satu area.
+    area = template.get("essayAreaRectMm")
+    if area:
         _text(
             c,
-            "jawaban esai siswa",
-            rect["x"] + 2,
-            rect["y"] + rect["h"] - 4,
+            "II. ZONA JAWABAN ESAI",
+            CONTENT_LEFT_MM,
+            area["y"] - ESSAY_AREA_GAP_MM,
+            size_pt=7.5,
+        )
+        _dashed_rect(c, area["x"], area["y"], area["w"], area["h"])
+        _text(
+            c,
+            "Tulis jawaban esai di area ini. Nomor soal ditulis sendiri oleh siswa.",
+            area["x"] + 2,
+            area["y"] + area["h"] - 4,
             size_pt=5,
             color=GUIDE,
         )

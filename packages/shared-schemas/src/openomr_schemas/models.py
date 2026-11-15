@@ -85,22 +85,6 @@ class MultipleChoiceSlot(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
-class EssaySlot(BaseModel):
-    """Satu nomor esai.
-
-    Hanya ada satu sub-bagian: area kosong tempat siswa menulis jawaban.
-    Skor esai tidak ditulis di kertas — guru menilai sendiri di aplikasi,
-    lalu memasukkan hasilnya per nomor.
-    """
-
-    question_number: int = Field(ge=1, alias="questionNumber")
-    x_mm: float = Field(ge=0, alias="xMm")
-    y_mm: float = Field(ge=0, alias="yMm")
-    student_answer_rect_mm: RectMm = Field(alias="studentAnswerRectMm")
-
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-
 class ExamTemplate(BaseModel):
     """Metadata koordinat LJK.
 
@@ -120,7 +104,8 @@ class ExamTemplate(BaseModel):
     fiducials: list[Fiducial] = Field(min_length=4, max_length=4)
     name_crop_rect_mm: RectMm = Field(alias="nameCropRectMm")
     multiple_choice_slots: list[MultipleChoiceSlot] = Field(alias="multipleChoiceSlots")
-    essay_slots: list[EssaySlot] = Field(alias="essaySlots")
+    #: Satu area kosong untuk seluruh soal esai. ``None`` bila ujian tanpa esai.
+    essay_area_rect_mm: RectMm | None = Field(default=None, alias="essayAreaRectMm")
 
 
 # --------------------------------------------------------------------------- #
@@ -196,15 +181,6 @@ class DetectedMCAnswer(BaseModel):
     raw_candidates: list[OptionLabel] | None = Field(default=None, alias="rawCandidates")
 
 
-class EssayAnswerCrop(BaseModel):
-    """Potongan gambar area jawaban esai, supaya guru bisa membaca tulisan tangan."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    question_number: int = Field(ge=1, alias="questionNumber")
-    image_data_url: str = Field(alias="imageDataUrl")
-
-
 class EssayMark(BaseModel):
     """Hasil penilaian guru atas satu soal esai.
 
@@ -229,8 +205,8 @@ class OMRScanResponse(BaseModel):
     student_name_crop_url: str = Field(alias="studentNameCropUrl")
     full_warped_image_url: str = Field(alias="fullWarpedImageUrl")
     mc_answers: list[DetectedMCAnswer] = Field(alias="mcAnswers")
-    #: Skor esai dinilai guru di aplikasi — mesin hanya memotong areanya.
-    essay_crops: list[EssayAnswerCrop] = Field(alias="essayCrops")
+    #: Skor esai dinilai guru di aplikasi — mesin hanya memotong satu area.
+    essay_area_crop_url: str | None = Field(default=None, alias="essayAreaCropUrl")
 
 
 class GradedStudentRecord(BaseModel):
@@ -276,10 +252,8 @@ __all__ = [
     "BubbleReadStatus",
     "Class",
     "DetectedMCAnswer",
-    "EssayAnswerCrop",
     "EssayMark",
     "EssayQuestionConfig",
-    "EssaySlot",
     "ExamConfig",
     "ExamTemplate",
     "Fiducial",

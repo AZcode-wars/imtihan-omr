@@ -27,14 +27,13 @@ tests/
 > **Aturan:** kalau struktur berubah, ubah **JSON Schema dulu**, baru cermin di
 > `omr.ts` dan `models.py`. Test kontrak akan menangkap kalau cerminnya lupa.
 
-## Dua sub-bagian zona esai
+## Zona esai
 
-Satu nomor esai punya **dua area dengan koordinat terpisah**:
-
-| Field | Isi | Dibaca mesin? |
-|---|---|---|
-| `studentAnswerRectMm` | Area kosong untuk tulisan tangan siswa | Tidak — hanya ditampilkan sebagai crop saat verifikasi |
-| `valueOptions` + `halfModifierOffset` | Lingkaran skor 0–5 + kotak `[+0.5]` yang diisi guru | Ya |
+Satu area kosong besar tempat siswa menulis jawaban esai (`essayAreaRectMm`).
+Tidak ada nomor per soal di kertas — siswa menomori sendiri jawabannya.
+Skor esai dinilai oleh guru di aplikasi web, bukan dibaca mesin dari kertas.
+Mesin OMR hanya memotong (*crop*) area ini (`essayAreaCropUrl`) untuk ditampilkan ke guru.
+Bila ujian tidak memiliki soal esai, `essayAreaRectMm` bernilai `null`.
 
 ## Menjalankan test
 

@@ -30,7 +30,10 @@ import numpy as np
 from .pdf import render_pdf
 from .template import (
     CLASS_BOX_RECT_MM,
+    CONTENT_LEFT_MM,
+    ESSAY_AREA_GAP_MM,
     INSTRUCTION_BOX_RECT_MM,
+    INSTRUCTION_COLUMNS,
     INSTRUCTIONS,
     MC_SECTION_TITLE_Y_MM,
     PAPER_TITLE_X_MM,
@@ -201,25 +204,12 @@ def render_synthetic(
     cw, ch = _px(crop["w"], px_per_mm), _px(crop["h"], px_per_mm)
     _dashed_rect(img, cx, cy, cw, ch, faint)
     cv2.putText(
-        img, "NAMA", (cx + 4, cy + 11), cv2.FONT_HERSHEY_SIMPLEX, 0.3, faint, 1, cv2.LINE_AA
+        img, "NAMA", (cx + 6, cy + 24), cv2.FONT_HERSHEY_SIMPLEX, 0.3, faint, 1, cv2.LINE_AA
     )
     cv2.putText(
         img,
         "____________________",
-        (cx + 30, cy + 13),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.4,
-        faint,
-        1,
-        cv2.LINE_AA,
-    )
-    cv2.putText(
-        img, "KELAS", (cx + 4, cy + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.3, faint, 1, cv2.LINE_AA
-    )
-    cv2.putText(
-        img,
-        "____________________",
-        (cx + 30, cy + 27),
+        (cx + 34, cy + 26),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.4,
         faint,
@@ -257,19 +247,22 @@ def render_synthetic(
         cv2.LINE_AA,
     )
 
-    # --- Petunjuk pengisian (ruang kosong di kanan zona PG) ---
+    # --- Petunjuk pengisian (dipindah ke bawah kotak nama & kelas) ---
     guide = INSTRUCTION_BOX_RECT_MM
     gx, gy = _px(guide["x"], px_per_mm), _px(guide["y"], px_per_mm)
     gw, gh = _px(guide["w"], px_per_mm), _px(guide["h"], px_per_mm)
     _dashed_rect(img, gx, gy, gw, gh, faint)
     cv2.putText(
-        img, "PETUNJUK", (gx + 4, gy + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.32, faint, 1, cv2.LINE_AA
+        img, "PETUNJUK", (gx + 6, gy + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.32, faint, 1, cv2.LINE_AA
     )
+    col_w = gw / INSTRUCTION_COLUMNS
     for i, line in enumerate(INSTRUCTIONS):
+        col = i % INSTRUCTION_COLUMNS
+        row = i // INSTRUCTION_COLUMNS
         cv2.putText(
             img,
             f"- {line}",
-            (gx + 4, gy + 30 + i * 22),
+            (int(gx + 6 + col * col_w), gy + 34 + row * 18),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.3,
             faint,
@@ -281,7 +274,7 @@ def render_synthetic(
     cv2.putText(
         img,
         "I. PILIHAN GANDA",
-        (_px(14, px_per_mm), _px(MC_SECTION_TITLE_Y_MM, px_per_mm)),
+        (_px(CONTENT_LEFT_MM, px_per_mm), _px(MC_SECTION_TITLE_Y_MM, px_per_mm)),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.4,
         ink,
@@ -312,31 +305,32 @@ def render_synthetic(
             if opt["label"] in marked:
                 _fill_bubble(img, ox, oy, bubble_r, plan["fillRatio"])
 
-    # --- Zona esai: hanya area kosong jawaban siswa (tanpa lingkaran skor) ---
-    essay_top = min((s["yMm"] for s in template["essaySlots"]), default=0.0)
-    if template["essaySlots"]:
+    # --- Zona esai: SATU kotak besar, tanpa nomor per soal ---
+    area = template.get("essayAreaRectMm")
+    if area:
         cv2.putText(
             img,
             "II. ZONA JAWABAN ESAI",
-            (_px(14, px_per_mm), _px(essay_top - 2, px_per_mm)),
+            (
+                _px(CONTENT_LEFT_MM, px_per_mm),
+                _px(area["y"] - ESSAY_AREA_GAP_MM, px_per_mm),
+            ),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.4,
             ink,
             1,
             cv2.LINE_AA,
         )
-    for slot in template["essaySlots"]:
-        rect = slot["studentAnswerRectMm"]
-        rx, ry = _px(rect["x"], px_per_mm), _px(rect["y"], px_per_mm)
-        rw, rh = _px(rect["w"], px_per_mm), _px(rect["h"], px_per_mm)
-        _dashed_rect(img, rx, ry, rw, rh, faint)
+        ax, ay = _px(area["x"], px_per_mm), _px(area["y"], px_per_mm)
+        aw, ah = _px(area["w"], px_per_mm), _px(area["h"], px_per_mm)
+        _dashed_rect(img, ax, ay, aw, ah, faint)
         cv2.putText(
             img,
-            f"E{slot['questionNumber']}",
-            (_px(14, px_per_mm), _px(rect["y"] + rect["h"] / 2, px_per_mm) + 4),
+            "Tulis jawaban esai di area ini. Nomor soal ditulis sendiri oleh siswa.",
+            (ax + 6, ay + ah - 12),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.35,
-            ink,
+            0.3,
+            faint,
             1,
             cv2.LINE_AA,
         )
@@ -369,16 +363,14 @@ def render_synthetic(
             "noiseSigma": noise_sigma,
         },
         "mc": mc_truth,
-        # Zona esai tidak bertanda di kertas. Yang dicatat adalah posisi area
-        # jawabannya — mesin harus memotong tepat di area ini supaya guru
-        # bisa membaca tulisan tangan saat menilai.
-        "essay": [
-            {
-                "questionNumber": slot["questionNumber"],
-                "answerRectMm": slot["studentAnswerRectMm"],
-            }
-            for slot in template["essaySlots"]
-        ],
+        # Zona esai tidak bertanda di kertas — hanya satu area kosong.
+        # Yang dicatat adalah posisinya: mesin harus memotong tepat di area
+        # ini supaya guru bisa membaca tulisan tangan saat menilai.
+        "essay": (
+            {"answerRectMm": template["essayAreaRectMm"]}
+            if template.get("essayAreaRectMm")
+            else None
+        ),
     }
     out_truth = Path(truth_path)
     out_truth.parent.mkdir(parents=True, exist_ok=True)
@@ -428,10 +420,18 @@ def main(argv: list[str] | None = None) -> int:
     print(f"sheet     : {out_dir / 'sheet.png'}")
     print(f"truth     : {out_dir / 'truth.json'}")
     print(
-        f"layout    : {args.pg} PG ({layout.mc_rows} baris), "
+        f"layout    : {args.pg} PG ({layout.rows_per_column} baris/kolom), "
         f"{args.essay} esai, isi sampai y={layout.content_bottom_y:.1f} mm"
     )
-    print(f"ground truth: {len(truth['mc'])} PG, {len(truth['essay'])} esai")
+    essay_area = truth["essay"]["answerRectMm"] if truth["essay"] else None
+    print(
+        f"zona esai : "
+        + (
+            f"{essay_area['w']:.0f} × {essay_area['h']:.0f} mm"
+            if essay_area
+            else "tidak ada"
+        )
+    )
     return 0
 
 

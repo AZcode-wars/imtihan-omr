@@ -252,23 +252,24 @@ State: default · hover (border `brand/700`) · active (`scale-0.95`) · selecte
 ## 16. EssayMarkRow (Penilaian Esai oleh Guru)
 
 > Menggantikan `ScoreStepper` yang lama (tombol ± untuk nilai 0–5 dengan modifier
-> `[+.5]`). Subsection: skor esai **tidak lagi dibaca dari kertas** — guru
-> menilai sendiri, jadi komponen ini adalah input, bukan stepper angka.
+> `[+.5]`). Skor esai **tidak lagi dibaca dari kertas** — guru menilai sendiri,
+> jadi komponen ini adalah input, bukan stepper angka.
+>
+> Karena LJK memuat **satu** area esai untuk seluruh nomor (FR-1.5), gambar
+> tulisan tangan **tidak** ada per baris. Zone esai ditampilkan **sekali** di
+> atas daftar baris (komponen `EssayAreaPreview`, lihat §16.1), lalu baris-baris
+> ini hanya berisi penilaian.
 
 Satu baris per nomor esai. `bg slate/50`, border 1px `slate/200/80`, `radius/md`, `px-10`, `py-8`.
 
 ```
 ┌──────────────────────────────────────────────────┐
-│ ┌──────────┐  E1  [ ✓ Benar ] [ ✗ Salah ]         │
-│ │ crop     │      nilai: [ 5 ]                    │
-│ │ tulisan  │                                       │
-│ └──────────┘                                       │
+│ ✓ E1   [ ✓ Benar ] [ ✗ Salah ]     nilai: [ 5 ] │
 └──────────────────────────────────────────────────┘
 ```
 
 | Bagian | Spesifikasi |
 |---|---|
-| Crop tulisan tangan | Rasio 16:9, lebar 96px, `radius/sm`, border 1px `slate/200`, `bg white`. Sumber: `essayCrops` dari engine |
 | Label | `bodyStrong` 13/18 700 `slate/600` — "E1" (nomor esai terpisah dari PG) |
 | Tombol **Benar** | **44 × 44**, `radius/sm`, `bg brand/700` + teks putih saat aktif, `bg white` + border `slate/200` saat tidak |
 | Tombol **Salah** | **44 × 44**, `radius/sm`, `bg white` + border `slate/200` + teks `slate/700` saat aktif |
@@ -284,6 +285,17 @@ Satu baris per nomor esai. `bg slate/50`, border 1px `slate/200/80`, `radius/md`
 | Mengubah angka di kolom | Status soal menjadi `PARTIAL`; angka dibatasi 0…`maxScore`, kelipatan 0,5 |
 
 Logikanya ada di `apps/web/src/lib/scoring.ts` → `essayPartialForOutcome()` dan `essayPointsFor()`.
+
+### 16.1 EssayAreaPreview (potongan area esai)
+
+Satu potongan gambar **area esai** (bukan per nomor). Sumber: `essayAreaCropUrl`
+dari engine. Muncul sekali di atas daftar `EssayMarkRow`.
+
+| Bagian | Spesifikasi |
+|---|---|
+| Gambar | Lebar penuh, rasio mengikuti area LJK (176 × 48 mm ≈ 11 : 3), `radius/sm`, border 1px `slate/200`, `bg white` |
+| Label | "Jawaban esai siswa" `caption` 11/14 `slate/500` |
+| Kosong | Bila `essayAreaCropUrl` null → sembunyikan blok ini |
 
 ---
 

@@ -16,7 +16,7 @@
     "fiducials",
     "nameCropRectMm",
     "multipleChoiceSlots",
-    "essaySlots"
+    "essayAreaRectMm"
   ],
   "properties": {
     "id": { "type": "string", "minLength": 1 },
@@ -37,9 +37,9 @@
       "type": "array",
       "items": { "$ref": "#/$defs/mcSlot" }
     },
-    "essaySlots": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/essaySlot" }
+    "essayAreaRectMm": {
+      "description": "Satu area kosong tempat siswa menulis jawaban esai. Tidak ada nomor per soal di kertas — siswa menomori sendiri jawabannya, sehingga mesin cukup memotong satu area ini untuk ditampilkan ke guru. null bila ujian tidak punya soal esai.",
+      "oneOf": [{ "$ref": "#/$defs/rectMm" }, { "type": "null" }]
     }
   },
   "$defs": {
@@ -99,20 +99,6 @@
               "yMm": { "type": "number", "minimum": 0 }
             }
           }
-        }
-      }
-    },
-    "essaySlot": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["questionNumber", "xMm", "yMm", "studentAnswerRectMm"],
-      "properties": {
-        "questionNumber": { "type": "integer", "minimum": 1 },
-        "xMm": { "type": "number", "minimum": 0 },
-        "yMm": { "type": "number", "minimum": 0 },
-        "studentAnswerRectMm": {
-          "$ref": "#/$defs/rectMm",
-          "description": "Area kosong tempat siswa menulis jawaban esai. Mesin hanya memotong (crop) area ini untuk ditampilkan ke guru; skor esai dinilai guru di aplikasi, bukan dibaca dari kertas."
         }
       }
     }

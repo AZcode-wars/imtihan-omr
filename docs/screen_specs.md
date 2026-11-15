@@ -284,10 +284,11 @@ Latar `slate/950`. Tidak ada garis laser bergerak (keputusan "kalem"). Tombol se
 │ └──────────────────────────────────┘ │
 ├──────────────────────────────────────┤
 │ Skor Esai — diisi guru               │
-│ ┌──────────┐┌──────────────────────┐  │
-│ │crop tulis││ E1 [✓Benar] [✗Salah] │  │
-│ │ tangan   ││    nilai: [5]         │  │
-│ └──────────┘└──────────────────────┘  │
+│ ┌──────────────────────────────────┐ │
+│ │  crop area esai (satu gambar)   │ │
+│ └──────────────────────────────────┘ │
+│ E1 [✓Benar] [✗Salah]   nilai: [5]   │
+│ E2 [✓Benar] [✗Salah]   nilai: [3,5] │
 ├──────────────────────────────────────┤
 │ [ Simpan & Scan Berikutnya      → ]  │ ← sticky
 └──────────────────────────────────────┘
@@ -324,11 +325,19 @@ Hanya nomor berstatus `EMPTY`, `MULTIPLE`, atau `LOW_CONFIDENCE` yang tampil (FR
 
 ### Zona 4 — Penilaian Esai (diisi guru)
 
-`grid-cols-2 gap-8`. Tiap baris adalah satu nomor esai, terdiri dari:
+Karena LJK memuat **satu** area esai untuk seluruh nomor (FR-1.5), Zone 4 punya **dua bagian**:
+
+**a) Potongan area esai** — satu gambar full-width di atas daftar baris.
 
 | Bagian | Spec |
 |---|---|
-| Crop tulisan tangan | Potongan gambar area jawaban esai (dari `essayCrops`), rasio 16:9, `rounded-md`, border 1px `slate/200` |
+| Crop area esai | Potongan gambar **satu** area jawaban esai (dari `essayAreaCropUrl`), rasio mengikuti area (176 × 48 mm ≈ 11 : 3), `rounded-md`, border 1px `slate/200`, `bg white` |
+| Label | "Jawaban esai siswa" `caption` 11/14 `slate/500` |
+
+**b) Daftar penilaian per nomor** — `grid-cols-2 gap-8`. Tiap baris adalah satu nomor esai:
+
+| Bagian | Spec |
+|---|---|
 | Label | `E1`, `E2`, … (nomor esai **terpisah** dari nomor PG), `bodyStrong` 13/18 700 `slate/600` |
 | Tombol **Benar** | Toggle. Memilihnya mengisi otomatis kolom skor parsial dengan poin penuh (`maxScore`) |
 | Tombol **Salah** | Toggle. Memilihnya mengisi otomatis kolom skor parsial dengan `0` |
@@ -437,13 +446,16 @@ Tombol mengunduh CSV dengan kolom: `NIS, Nama, Skor PG, Skor Esai, Nilai Akhir, 
 │      │ ┌─────────┐ ┌─────────┐   │  │
 │      │ │Nama: ___│ │Kelas: __│   │  │
 │      │ └─────────┘ └─────────┘   │  │
+│      │ ┌───────────────────────┐ │  │
+│      │ │ PETUNJUK              │ │  │
+│      │ └───────────────────────┘ │  │
 │      │ I. PILIHAN GANDA (25)      │  │
 │      │ 01 (A)(B)(C)(D)  14 (A)(B)(C)(D)│
 │      │ 02 (A)(B)(C)(D)  15 ...    │  │
 │      │ II. ZONA JAWABAN ESAI      │  │
-│      │ E1 ┌──────────────────────┐│  │
-│      │ E2 │                      ││  │
-│      │ E3 └──────────────────────┘│  │
+│      │ ┌────────────────────────┐│  │
+│      │ │                        ││  │
+│      │ └────────────────────────┘│  │
 │      └───────────────────────────┘  │
 ├──────────────────────────────────────┤
 │ 25 PG · 5 Esai · A4 · 2 kolom        │
@@ -458,67 +470,64 @@ Tombol mengunduh CSV dengan kolom: `NIS, Nama, Skor PG, Skor Esai, Nilai Akhir, 
 | Margin fiducial | 8 mm | Sudut zona aktif |
 | Fiducial kiri-atas | **14 × 14 mm** | Sudut zona aktif |
 | Fiducial 3 lainnya | **10 × 10 mm** | Sudut zona aktif |
-| Bubble PG | ⌀ **4,5 mm** | Jarak antar pusat ≥ **6 mm** |
-| Jarak nomor → bubble pertama | 9 mm | Kolom PG |
-| Posisi kolom PG | kolom 1 x = 14 mm, kolom 2 x = 62 mm | Penomoran kolom 1 → kolom 2 |
+| Area konten | 176 mm (x = 14 → 190 mm) | Semua elemen di dalamnya |
+| Bubble PG | ⌀ **4,5 mm** | Jarak antar pusat ≥ **8,5 mm** |
+| Jarak nomor → bubble pertama | 12 mm | Kolom PG |
+| Posisi kolom PG | kolom 1 x = 14 mm, kolom 2 x = 108 mm | Penomoran kolom 1 → kolom 2 |
 | Tata letak | **2 kolom** | |
-| Judul utama | x = 25 mm | Di kanan fiducial kiri-atas |
-| Zona nama | Kotak garis putus, 90 × 12 mm | Di atas zona aktif |
-| Kotak petunjuk | 90 × 40 mm | Di kanan zona PG |
-| **Zona esai** | **Satu area per nomor, tanpa lingkaran skor** | Di bawah zona PG |
-| Area jawaban siswa | **164 mm × tinggi dibagi rata** (min. 14 mm) | Sepanjang area konten |
+| Pengelompokan | Setiap **5 nomor** satu blok, jeda antar kelompok **+7 mm** | Batas kolom tidak diberi jeda tambahan |
+| Judul utama | x = 25 mm, baseline y = 26 mm | Di kanan fiducial kiri-atas |
+| Zona nama | Kotak garis putus, 90 × 12 mm (x = 14, y = 30) | Di atas zona aktif |
+| Zona kelas | Kotak garis putus, 80 × 12 mm (x = 110, y = 30) | Sebelah zona nama |
+| **Kotak petunjuk** | **176 × 16 mm** (x = 14, y = 46) | **Di bawah kotak nama & kelas** |
+| Judul "I. PILIHAN GANDA" | baseline y = 78 mm | ≥ 16 mm di bawah kotak petunjuk |
+| Baris bubble pertama | y = 88 mm | ≥ 10 mm di bawah judul seksi |
+| **Zona esai** | **Satu area besar**, tanpa nomor per soal | Di bawah zona PG |
+| Area jawaban siswa | **176 mm × tinggi sisa halaman** (min. 30 mm) | x = 14, y = 228 (untuk 25 PG + zona esai) |
 
-> **Perubahan v1.1:** zona esai tidak lagi memuat lingkaran skor `0–5` + `[+.5]`.
-> Area jawaban sekarang selebar penuh (164 mm) dan tingginya dibagi rata ke seluruh
-> nomor esai. Nomor esai terpisah dari nomor PG (`E1`…`EM`). Skor dinilai guru
-> di aplikasi — lihat Zone 4 di bawah.
+> **Perubahan v1.2 (revisi pemilik proyek atas gambar revisi):**
+> 1. **Jarak bubble dikembalikan ke 8,5 mm** dan tiap 5 nomor dikelompokkan dengan jeda +7 mm.
+> 2. **Kotak PETUNJUK dipindahkan** dari kanan zona PG ke **bawah kotak nama & kelas**, melingkupi lebar area konten.
+> 3. **Jarak antar elemen dilegakan**: judul seksi dan judul zona esai diberi jarak ≥ 10 mm dari elemen di atasnya.
+> 4. **Zona esai jadi satu kotak besar** — tanpa nomor per soal, tanpa lingkaran skor. Siswa yang menomori sendiri jawabannya.
 
 ### Kapasitas satu halaman A4
 
-Dibatasi jarak antar pusat antar bubble **6 mm** (PRD FR-1.2) — bukan pilihan desain. Angka di bawah hasil implementasi (`packages/omr-engine`, `compute_layout`):
+Dibatasi jarak antar pusat antar bubble **8,5 mm** + jeda pengelompokan 5 nomor (PRD FR-1.2) — bukan pilihan desain. Angka di bawah hasil implementasi (`packages/omr-engine`, `compute_layout`):
 
-| Soal esai | PG maksimum |
+| Zona esai | PG maksimum |
 |---|---|
-| 0 | 50 |
-| 1 | 50 |
-| 2 | 50 |
-| 3 | 50 |
-| 4 | 50 |
-| 5 | 44 |
-| 6 | 38 |
-| 7 | 32 |
-| 8 | 26 |
-| 9 | 20 |
-| 10 | 14 |
+| Tanpa zona esai | **40** |
+| Dengan zona esai | **30** |
 
-Kombinasi yang melebihi batas **ditolak sistem** dengan pesan yang bisa ditindaklanjuti guru. Layar `/setup` **wajib** menampilkan batas ini secara langsung dari `max_essay_count_for(pgCount)` — bukan hanya lewat pesan error saat menekan tombol cetak.
+Zona esai kini **satu kotak besar**, jadi **jumlah soal esai tidak lagi mengubah tata letak** — yang menentukan hanya *ada/tidaknya* zona esai. Kombinasi yang melebihi batas **ditolak sistem** dengan pesan yang bisa ditindaklanjuti guru. Layar `/setup` **wajib** menampilkan batas ini secara langsung dari `max_pg_count_for(essayCount)` — bukan hanya lewat pesan error saat menekan tombol cetak.
 
-### Bentuk blok esai (satu area per nomor)
+> **Konsekuensi produk (menunggu keputusan pemilik proyek):** PRD FR-1.1 semula menargetkan 50 soal PG dalam satu halaman. Dengan jarak 8,5 mm + 2 kolom, batasnya turun ke 40 PG (tanpa zona esai). Bila 50 PG tetap dibutuhkan, pilihannya **tambah kolom PG ke-3** → 60 PG tanpa zona esai / 45 PG dengan zona esai (perubahan 2 baris di `template.py`).
 
-Setiap nomor esai punya **satu area kosong selebar penuh** untuk tulisan tangan siswa. Tidak ada lagi lingkaran skor di kertas:
+### Bentuk zona esai (satu area besar)
+
+Zona esai adalah **satu kotak kosong selebar penuh**. Tidak ada nomor per soal — siswa yang menomori sendiri jawabannya:
 
 ```
-┌── ZONA JAWABAN ESAI ───────────────────────────────────────┐
-│ E1  ┌────────────────────────────────────────────────────┐   │
-│     │                                                    │   │
-│     │              tulisan tangan siswa                  │   │
-│     │                                                    │   │
-│     └────────────────────────────────────────────────────┘   │
-│ E2  ┌────────────────────────────────────────────────────┐   │
-│     │              tulisan tangan siswa                  │   │
-│     └────────────────────────────────────────────────────┘   │
+┌── II. ZONA JAWABAN ESAI ────────────────────────────────────┐
+│ ┌──────────────────────────────────────────────────────────┐ │
+│ │                                                          │ │
+│ │              tulisan tangan siswa                        │ │
+│ │              (siswa yang menulis nomornya sendiri)       │ │
+│ │                                                          │ │
+│ └──────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 | Metadata | Isi | Dibaca mesin? |
 |---|---|---|
-| `studentAnswerRectMm` | Area jawaban siswa | Tidak — hanya di-*crop* lalu ditampilkan ke guru saat menilai |
+| `essayAreaRectMm` | Satu area jawaban esai | Tidak — hanya di-*crop* lalu ditampilkan ke guru saat menilai |
 
-Tinggi area dibagi rata ke seluruh nomor esai (minimal 14 mm agar muat ≥2 baris tulisan tangan), dengan jarak antar blok 4 mm.
+Tinggi area = sisa halaman di bawah zona Pilihan Ganda (minimal 30 mm agar cukup untuk menulis).
 
-> **Kenapa begitu:** dengan skor esai dinilai guru di aplikasi, tidak perlu ada ruang di kertas untuk lingkaran skor. Area jawaban menjadi jauh lebih luas — dan mesin hanya perlu memotong satu area per nomor untuk dibaca guru.
+> **Kenapa begitu:** dengan skor esai dinilai guru di aplikasi, tidak perlu ada ruang di kertas untuk lingkaran skor maupun nomor per soal. Area jawaban menjadi jauh lebih luas — dan mesin hanya perlu memotong **satu** area untuk dibaca guru.
 
-> **Alur guru (FR-5.4):** guru menilai esai → mencatat di kertas (atau ingatnya) → LJK selesai → dipindai → di aplikasi, Zone 4 menampilkan **satu baris per nomor esai** berisi crop tulisan tangan + tombol Benar/Salah + kolom skor parsial → digabung dengan skor PG menjadi nilai akhir.
+> **Alur guru (FR-5.4):** LJK selesai → dipindai → di aplikasi, Zone 4 menampilkan **satu potongan gambar area esai** + **satu baris per nomor esai** (tombol Benar/Salah + kolom skor parsial) → digabung dengan skor PG menjadi nilai akhir.
 
 ### Komponen
 

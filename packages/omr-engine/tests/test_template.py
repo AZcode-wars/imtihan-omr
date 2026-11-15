@@ -12,13 +12,21 @@ from openomr_schemas import ExamTemplate, load_exam_template_schema
 from omr_engine.template import (
     BUBBLE_DIAMETER_MM,
     BUBBLE_PITCH_MM,
+    CLASS_BOX_RECT_MM,
     COLUMN_X_MM,
     CONTENT_BOTTOM_MM,
+    ESSAY_AREA_GAP_MM,
+    ESSAY_AREA_MIN_H_MM,
     FIDUCIAL_OTHER_MM,
     FIDUCIAL_TL_MM,
+    GROUP_GAP_MM,
+    GROUP_SIZE,
     INSTRUCTION_BOX_RECT_MM,
     MARGIN_MM,
     MC_OPTION_OFFSET_MM,
+    MC_SECTION_TITLE_Y_MM,
+    MC_START_Y_MM,
+    NAME_CROP_RECT_MM,
     PAGE_HEIGHT_MM,
     PAGE_WIDTH_MM,
     PAPER_TITLE_X_MM,
@@ -27,6 +35,7 @@ from omr_engine.template import (
     build_validated_template,
     compute_layout,
     max_essay_count_for,
+    max_pg_count_for,
 )
 
 
@@ -42,6 +51,14 @@ def all_bubble_centers(template: dict) -> list[tuple[float, float]]:
     return centers
 
 
+def rows_per_column(template: dict) -> dict[float, list[tuple[int, float]]]:
+    """(nomor soal, y) tiap baris, dikelompokkan per kolom (x kolom)."""
+    grouped: dict[float, list[tuple[int, float]]] = {}
+    for slot in template["multipleChoiceSlots"]:
+        grouped.setdefault(slot["xMm"], []).append((slot["questionNumber"], slot["yMm"]))
+    return grouped
+
+
 # --------------------------------------------------------------------------- #
 # Tata letak
 # --------------------------------------------------------------------------- #
@@ -49,7 +66,7 @@ def all_bubble_centers(template: dict) -> list[tuple[float, float]]:
 
 @pytest.mark.parametrize(
     ("pg", "essay"),
-    [(25, 5), (26, 5), (30, 5), (50, 0), (10, 10), (1, 0)],
+    [(25, 5), (26, 5), (30, 5), (40, 0), (10, 10), (1, 0)],
 )
 def test_layout_tidak_meluber_kertas(pg: int, essay: int) -> None:
     layout = compute_layout(pg, essay)
@@ -58,7 +75,7 @@ def test_layout_tidak_meluber_kertas(pg: int, essay: int) -> None:
 
 @pytest.mark.parametrize(
     ("pg", "essay"),
-    [(25, 5), (26, 5), (30, 5), (50, 0), (10, 10)],
+    [(25, 5), (26, 5), (30, 5), (40, 0), (10, 10)],
 )
 def test_semua_bubble_dalam_batas_kertas(pg: int, essay: int) -> None:
     template = build_template(pg_count=pg, essay_count=essay)
@@ -69,8 +86,8 @@ def test_semua_bubble_dalam_batas_kertas(pg: int, essay: int) -> None:
 
 
 @pytest.mark.parametrize(("pg", "essay"), [(25, 5), (30, 5), (20, 5)])
-def test_jarak_antar_pusat_minimal_6_mm(pg: int, essay: int) -> None:
-    """PRD FR-1.2: jarak antar pusat antar bubble minimal 6 mm."""
+def test_jarak_antar_pusat_minimal_8_5_mm(pg: int, essay: int) -> None:
+    """PRD FR-1.2: jarak antar pusat antar bubble minimal 8,5 mm."""
     template = build_template(pg_count=pg, essay_count=essay)
     centers = all_bubble_centers(template)
     for i, (x1, y1) in enumerate(centers):
@@ -106,6 +123,69 @@ def test_penomoran_berjalan_kolom_1_lalu_kolom_2() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Pengelompokan 5 nomor
+# --------------------------------------------------------------------------- #
+
+
+def test_setiap_5_nomor_dikelompokkan_dengan_jeda_lebih_besar() -> None:
+    """Setiap 5 nomor jadi satu blok, jaraknya lebih lega dari dalam blok."""
+    template = build_template(pg_count=25, essay_count=0)
+    for _x, rows in rows_per_column(template).items():
+        for (n1, y1), (_n2, y2) in zip(rows, rows[1:]):
+            gap = round(y2 - y1, 3)
+            if n1 % GROUP_SIZE == 0:
+                assert gap == pytest.approx(BUBBLE_PITCH_MM + GROUP_GAP_MM, abs=0.01), (
+                    f"jeda setelah nomor {n1} hanya {gap} mm"
+                )
+            else:
+                assert gap == pytest.approx(BUBBLE_PITCH_MM, abs=0.01), (
+                    f"jarak dalam blok setelah nomor {n1} adalah {gap} mm"
+                )
+
+
+def test_jeda_kelompok_lebih_besar_daripada_pitch() -> None:
+    assert GROUP_GAP_MM > 0
+    assert GROUP_SIZE == 5
+
+
+# --------------------------------------------------------------------------- #
+# Jarak lega antar elemen (revisi pemilik proyek)
+# --------------------------------------------------------------------------- #
+
+
+def test_judul_pilihan_ganda_jarak_lega_dari_petunjuk() -> None:
+    """Kotak petunjuk dipindah ke bawah nama & kelas; judul PG harus lega."""
+    assert INSTRUCTION_BOX_RECT_MM["y"] >= NAME_CROP_RECT_MM["y"] + NAME_CROP_RECT_MM["h"]
+    gap = MC_SECTION_TITLE_Y_MM - (
+        INSTRUCTION_BOX_RECT_MM["y"] + INSTRUCTION_BOX_RECT_MM["h"]
+    )
+    assert gap >= 10, f"judul Pilihan Ganda hanya {gap:.1f} mm dari kotak petunjuk"
+
+
+def test_baris_pg_pertama_jarak_lega_dari_judul_seksi() -> None:
+    gap = MC_START_Y_MM - MC_SECTION_TITLE_Y_MM
+    assert gap >= 8, f"baris pertama hanya {gap:.1f} mm dari judul seksi"
+
+
+def test_judul_zona_esai_jarak_lega_dari_baris_pg_terakhir() -> None:
+    layout = compute_layout(25, 5)
+    assert layout.essay_title_y - layout.pg_bottom_y >= 10
+
+
+def test_kotak_petunjuk_di_bawah_kotak_nama_dan_kelas() -> None:
+    """PETUNJUK pindah ke bawah kotak nama & kelas (revisi pemilik proyek)."""
+    guide_top = INSTRUCTION_BOX_RECT_MM["y"]
+    assert guide_top >= NAME_CROP_RECT_MM["y"] + NAME_CROP_RECT_MM["h"]
+    assert guide_top >= CLASS_BOX_RECT_MM["y"] + CLASS_BOX_RECT_MM["h"]
+    # Tidak boleh menabrak zona Pilihan Ganda.
+    assert guide_top + INSTRUCTION_BOX_RECT_MM["h"] < MC_SECTION_TITLE_Y_MM
+
+
+def test_kotak_petunjuk_melingkupi_lebar_konten() -> None:
+    assert INSTRUCTION_BOX_RECT_MM["w"] >= 150
+
+
+# --------------------------------------------------------------------------- #
 # Fiducial
 # --------------------------------------------------------------------------- #
 
@@ -129,29 +209,39 @@ def test_fiducial_di_sudut_zona_aktif() -> None:
     assert by_corner["BOTTOM_RIGHT"]["yMm"] + 10 == PAGE_HEIGHT_MM - MARGIN_MM
 
 
+def test_judul_utama_tidak_menabrak_fiducial_kiri_atas() -> None:
+    """Judul "LEMBAR JAWABAN KOMPUTER" harus di kanan fiducial kiri-atas."""
+    tl_right = MARGIN_MM + FIDUCIAL_TL_MM
+    assert PAPER_TITLE_X_MM > tl_right, "judul menabrak fiducial kiri-atas"
+
+
 # --------------------------------------------------------------------------- #
-# Zona esai — dua sub-bagian terpisah (Opsi 1)
+# Zona esai — SATU kotak besar
 # --------------------------------------------------------------------------- #
 
 
-def test_zona_esai_hanya_punya_area_jawaban_siswa() -> None:
-    """Zona esai = satu area kosong lebar; skor dinilai guru di aplikasi."""
+def test_zona_esai_hanya_satu_area_besar() -> None:
+    """Zona esai = satu area kosong; tidak ada nomor per soal di kertas."""
     template = build_template(pg_count=25, essay_count=5)
-    for slot in template["essaySlots"]:
-        rect = slot["studentAnswerRectMm"]
-        assert set(slot.keys()) == {"questionNumber", "xMm", "yMm", "studentAnswerRectMm"}
-        assert rect["w"] >= 150
-        assert rect["h"] >= 14
+    area = template["essayAreaRectMm"]
+    assert isinstance(area, dict)
+    assert set(area.keys()) == {"x", "y", "w", "h"}
+    assert area["w"] >= 150
+    assert area["h"] >= ESSAY_AREA_MIN_H_MM
 
 
-def test_area_jawaban_esai_berdampingan_tidak_tumpang_tindih() -> None:
-    """Kotak esai tidak boleh menabrak kotak di bawahnya."""
-    template = build_template(pg_count=25, essay_count=5)
-    slots = template["essaySlots"]
-    for a, b in zip(slots, slots[1:]):
-        ra = a["studentAnswerRectMm"]
-        rb = b["studentAnswerRectMm"]
-        assert rb["y"] >= ra["y"] + ra["h"], "kotak jawaban esai saling tumpang tindih"
+def test_zona_esai_tidak_ada_kalau_tidak_ada_soal_esai() -> None:
+    template = build_template(pg_count=25, essay_count=0)
+    assert template["essayAreaRectMm"] is None
+
+
+def test_area_esai_di_bawah_zona_pilihan_ganda() -> None:
+    layout = compute_layout(25, 5)
+    rect = layout.essay_area_rect
+    assert rect is not None
+    assert rect["y"] > layout.pg_bottom_y
+    # Sisi atas kotak esai mengikuti gap dari judul zona esai.
+    assert rect["y"] == pytest.approx(layout.essay_title_y + ESSAY_AREA_GAP_MM, abs=0.01)
 
 
 # --------------------------------------------------------------------------- #
@@ -169,7 +259,7 @@ def test_template_valid_menurut_model_pydantic() -> None:
     template = build_validated_template(pg_count=25, essay_count=5)
     assert isinstance(template, ExamTemplate)
     assert len(template.multiple_choice_slots) == 25
-    assert len(template.essay_slots) == 5
+    assert template.essay_area_rect_mm is not None
 
 
 def test_template_bisa_diserialisasi_ulang() -> None:
@@ -185,53 +275,38 @@ def test_template_bisa_diserialisasi_ulang() -> None:
 
 def test_kombinasi_yang_tidak_muat_ditolak_dengan_pesan_bergerak() -> None:
     with pytest.raises(TemplateOverflowError) as exc:
-        build_template(pg_count=50, essay_count=5)
+        build_template(pg_count=41, essay_count=5)
     message = str(exc.value)
-    assert "50" in message
+    assert "41" in message
     assert "tidak muat" in message
     assert "dua halaman" in message
 
 
 def test_batas_praktis_tercatat() -> None:
-    """44 PG + 5 esai masih muat; 46 PG + 5 esai sudah tidak.
+    """40 PG tanpa zona esai masih muat; 41 sudah tidak.
 
-    Batas ini dibatasi jarak antar pusat 6 mm (PRD FR-1.2) — bukan pilihan
-    desain. Antarmuka /setup harus memberi tahu guru sebelum mencetak.
+    Batas ini dibatasi jarak antar pusat 8,5 mm (PRD FR-1.2) plus jeda
+    pengelompokan 5 nomor — bukan pilihan desain. Antarmuka /setup harus
+    memberi tahu guru sebelum mencetak.
     """
-    assert compute_layout(44, 5).content_bottom_y <= CONTENT_BOTTOM_MM
+    assert compute_layout(40, 0).content_bottom_y <= CONTENT_BOTTOM_MM
     with pytest.raises(TemplateOverflowError):
-        build_template(pg_count=46, essay_count=5)
+        build_template(pg_count=41, essay_count=0)
 
 
-def test_judul_utama_tidak_menabrak_fiducial_kiri_atas() -> None:
-    """Judul "LEMBAR JAWABAN KOMPUTER" harus di kanan fiducial kiri-atas."""
-    tl_right = MARGIN_MM + FIDUCIAL_TL_MM
-    assert PAPER_TITLE_X_MM > tl_right, "judul menabrak fiducial kiri-atas"
-
-
-def test_kotak_petunjuk_di_kanan_zona_pilihan_ganda() -> None:
-    """Kotak petunjuk mengisi ruang kosong, tidak menabrak kolom PG."""
-    assert INSTRUCTION_BOX_RECT_MM["x"] > COLUMN_X_MM[1] + MC_OPTION_OFFSET_MM
-    assert (
-        INSTRUCTION_BOX_RECT_MM["x"]
-        > COLUMN_X_MM[1] + MC_OPTION_OFFSET_MM + 3 * BUBBLE_PITCH_MM + BUBBLE_DIAMETER_MM
-    )
-
-
-def test_kotak_jawaban_esai_tidak_saling_tumpang_tindih() -> None:
-    """Jarak antar blok esai harus >= tinggi kotak + 4 mm."""
-    for pg, essay in [(25, 5), (28, 5), (20, 6), (10, 10)]:
-        layout = compute_layout(pg, essay)
-        assert layout.essay_pitch >= layout.essay_answer_h + 4
+def test_zona_esai_membatasi_jumlah_pg() -> None:
+    """Dengan zona esai, kapasitas PG turun (zona esai butuh ruang)."""
+    assert max_pg_count_for(0) == 40
+    assert max_pg_count_for(5) == 30
 
 
 def test_max_essay_count_memberi_petunjuk_untuk_ui() -> None:
-    # 50 PG masih muat sampai 4 soal esai; lebih dari itu tidak.
-    assert max_essay_count_for(50) == 4
-    # 25 PG + 10 soal esai tidak muat: kotak jawaban minimum 14 mm (2 baris
-    # handwriting). 8 soal esai masih muat.
-    assert max_essay_count_for(25) == 8
-    assert max_essay_count_for(10) >= 10
+    # Zona esai kini satu kotak besar: jumlah soal esai tidak mengubah
+    # tinggi area, jadi batasnya hanya "ada zona esai atau tidak".
+    assert max_essay_count_for(25) == 10
+    assert max_essay_count_for(30) == 10
+    # 40 PG tidak muat kalau zona esai ikutada.
+    assert max_essay_count_for(40) == 0
 
 
 def test_jumlah_pg_nol_ditolak() -> None:

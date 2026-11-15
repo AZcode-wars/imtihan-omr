@@ -168,5 +168,6 @@
 | 1 — Fondasi repo | ✅ | `02bceca` | Next 16.4.6 / Tailwind v4.3.3 / shadcn radix-nova / Python 3.13.5. 17/17 token identik. Modul Python bernama `omr_engine` (bukan `omr` — nama device cadangan Windows). |
 | 1 — perbaikan kontras | ✅ | `9b718e1` | Label warna di halaman preview pakai pasangan foreground terhitung (bukan `mix-blend-difference`). Aturan kontras formal + larangan `brand/500` sebagai latar teks ditambahkan ke `docs/design_tokens.md` §11.1–11.2. |
 | 2 — Kontrak & logika | ✅ | `713e0f3` | JSON Schema `ExamTemplate` = kontrak tunggal + cermin TS/Pydantic + fixture. 12 test kontrak Python, 36 test vitest scoring. `shadcn` CLI pindah ke devDependencies. |
-| 3 — Engine template & PDF | ✅ | `feat(3)` | `template.py` (sumber koordinat mm) → `pdf.py` (ReportLab, A4) + `synth.py` (LJK sintetis + ground truth, OpenCV). 45 test pytest, termasuk PDF-vs-template. Kapasitas halaman ditemukan: 0 esai → 50 PG, 5 esai → 30 PG, 10 esai → 10 PG. |
+| 3 — Engine template & PDF | ✅ | `23c6533` → `4b3e4b9` → `d829987` | `template.py` (sumber koordinat mm) → `pdf.py` (ReportLab, A4) + `synth.py` (LJK sintetis + ground truth, OpenCV). 56 test pytest. Direvisi via Amemen 1 & 2. |
+| 3 — Revisi v2 LJK A4 | ✅ | (uncommitted) | Bubble pitch dikembalikan ke 8,5 mm + gap 5 nomor 7 mm. Kotak petunjuk di bawah nama & kelas (176×16 mm). Zona esai: single `essayAreaRectMm` tanpa nomor di kertas. Kapasitas: 40 PG tanpa esai, 30 PG dengan esai. FigCraft diperbarui. 65 test pytest engine + 14 test shared-schemas + 41 vitest passing. |
 | | | | |

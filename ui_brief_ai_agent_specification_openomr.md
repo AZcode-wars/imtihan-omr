@@ -133,15 +133,9 @@ export interface ExamTemplate {
     xMm: number; yMm: number;
     options: Array<{ label: OptionLabel; xMm: number; yMm: number }>;
   }>;
-  essaySlots: Array<{
-    questionNumber: number;
-    xMm: number; yMm: number;
-    // Area kosong tempat siswa menulis jawaban esai (sub-bagian 1 zona esai).
-    studentAnswerRectMm: { x: number; y: number; w: number; h: number };
-    // Lingkaran skor yang diisi guru (sub-bagian 2 zona esai): nilai 0-5 + modifier [+.5].
-    valueOptions: Array<{ value: number; xMm: number; yMm: number }>;
-    halfModifierOffset: { xMm: number; yMm: number }; // lingkaran [+.5]
-  }>;
+  // Satu area kosong untuk seluruh nomor esai. Tidak ada nomor per soal di
+  // kertas — siswa yang menomori sendiri jawabannya. null = tanpa zona esai.
+  essayAreaRectMm: { x: number; y: number; w: number; h: number } | null;
 }
 
 export interface Student {
@@ -170,8 +164,8 @@ export interface EssayMark {
 }
 
 /** Potongan gambar area jawaban esai, supaya guru bisa membaca tulisan tangan. */
-export interface EssayAnswerCrop {
-  questionNumber: number;
+export interface EssayAreaCrop {
+  /** Potongan gambar satu area jawaban esai (base64 data URL). */
   imageDataUrl: string;
 }
 
@@ -182,7 +176,8 @@ export interface OMRScanResponse {
   studentNameCropUrl: string;   // Potongan gambar tulisan tangan nama siswa
   fullWarpedImageUrl: string;   // Gambar LJK utuh hasil 4-point transform
   mcAnswers: DetectedMCAnswer[];
-  essayCrops: EssayAnswerCrop[];  // Skor esai dinilai guru di aplikasi
+  // Skor esai dinilai guru di aplikasi — mesin hanya memotong SATU area.
+  essayAreaCropUrl: string | null;
 }
 
 export interface GradedStudentRecord {

@@ -1,7 +1,8 @@
 """Uji silang: output generator template engine HARUS cocok dengan kontrak tunggal.
 
 Ini penjaga utama dari "cetak ≠ deteksi": kalau engine menghasilkan koordinat
-yang tidak lolos JSON Schema kontrak, semua pihak读写 struktur yang berbeda.
+yang tidak lolos JSON Schema kontrak, semua pihak akan membaca struktur yang
+berbeda.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ EXAMPLE_PATH = (
 )
 
 
-@pytest.mark.parametrize(("pg", "essay"), [(25, 5), (10, 10), (50, 0), (30, 4)])
+@pytest.mark.parametrize(("pg", "essay"), [(25, 5), (10, 10), (40, 0), (30, 4)])
 def test_output_engine_lolos_json_schema(pg: int, essay: int) -> None:
     schema = load_exam_template_schema()
     Draft202012Validator(schema).validate(build_template(pg_count=pg, essay_count=essay))
@@ -33,7 +34,7 @@ def test_output_engine_lolos_json_schema(pg: int, essay: int) -> None:
 def test_output_engine_lolos_model_pydantic() -> None:
     template = ExamTemplate.model_validate(build_template(pg_count=25, essay_count=5))
     assert len(template.multiple_choice_slots) == 25
-    assert len(template.essay_slots) == 5
+    assert template.essay_area_rect_mm is not None
 
 
 def test_fixture_resmi_lolos_kontrak() -> None:
@@ -55,18 +56,24 @@ def test_fixture_sama_dengan_output_engine() -> None:
     )
 
 
-def test_zona_esai_tidak_lagi_punya_lingkaran_skor() -> None:
-    """Setelhema Opsi baru, zona esai hanya punya area jawaban siswa."""
+def test_zona_esai_hanya_satu_area_besar() -> None:
+    """Zona esai = SATU kotak kosong; tidak ada nomor per soal."""
     template = build_template(pg_count=25, essay_count=5)
-    for slot in template["essaySlots"]:
-        assert set(slot.keys()) == {"questionNumber", "xMm", "yMm", "studentAnswerRectMm"}
-        assert slot["studentAnswerRectMm"]["w"] > 100  # lebar penuh
+    area = template["essayAreaRectMm"]
+    assert isinstance(area, dict)
+    assert set(area.keys()) == {"x", "y", "w", "h"}
+    assert area["w"] > 100  # lebar penuh area konten
 
 
 def test_area_jawaban_esai_lebar_penuh() -> None:
     """Kotak esai harus jauh lebih lebar daripada kotak pada model lama."""
     template = build_template(pg_count=25, essay_count=5)
-    for slot in template["essaySlots"]:
-        rect = slot["studentAnswerRectMm"]
-        assert rect["w"] >= 150
-        assert rect["h"] >= 14
+    area = template["essayAreaRectMm"]
+    assert area["w"] >= 150
+    assert area["h"] >= 30
+
+
+def test_tanpa_soal_esai_area_kosong() -> None:
+    """Ujian tanpa soal esai → area esai null (bukan array kosong)."""
+    template = build_template(pg_count=25, essay_count=0)
+    assert template["essayAreaRectMm"] is None

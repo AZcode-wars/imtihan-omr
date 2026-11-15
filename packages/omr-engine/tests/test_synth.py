@@ -66,8 +66,16 @@ def test_truth_json_tertulis_dan_konsisten(tmp_path: Path) -> None:
     assert on_disk == truth
     assert len(truth["mc"]) == 25
     # Zona esai tidak bertanda di kertas; yang dicatat adalah posisinya.
-    assert len(truth["essay"]) == 5
-    assert set(truth["essay"][0].keys()) == {"questionNumber", "answerRectMm"}
+    area = truth["essay"]["answerRectMm"]
+    assert area["w"] >= 150
+    assert area["h"] >= 30
+
+
+def test_truth_tanpa_zona_esai(tmp_path: Path) -> None:
+    """Ujian tanpa soal esai → tidak ada area esai di ground truth."""
+    template = build_template(pg_count=25, essay_count=0)
+    truth = render_synthetic(template, tmp_path / "sheet.png", tmp_path / "truth.json")
+    assert truth["essay"] is None
 
 
 def test_distribusi_status_ground_truth() -> None:

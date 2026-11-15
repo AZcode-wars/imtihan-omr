@@ -44,10 +44,10 @@ def test_example_parses_into_pydantic_model() -> None:
     assert template.page_height_mm == 297.0
     assert template.column_count == 2
     assert template.bubble_diameter_mm == 4.5
-    assert template.bubble_pitch_mm == 6.0
+    assert template.bubble_pitch_mm == 8.5
     assert len(template.fiducials) == 4
     assert len(template.multiple_choice_slots) == 25
-    assert len(template.essay_slots) == 5
+    assert template.essay_area_rect_mm is not None
 
 
 def test_pydantic_round_trip_preserves_json() -> None:
@@ -71,18 +71,13 @@ def test_fiducial_topleft_is_largest() -> None:
     assert by_corner["BOTTOM_RIGHT"] == 10.0
 
 
-def test_essay_slot_hanya_punya_area_jawaban_siswa() -> None:
+def test_area_esai_adalah_satu_kotak_penuh() -> None:
     """Zona esai = satu area kosong; skor dinilai guru di aplikasi."""
     template = ExamTemplate.model_validate(load_example())
-    for slot in template.essay_slots:
-        assert slot.student_answer_rect_mm.w > 0
-        assert slot.student_answer_rect_mm.h > 0
-        assert set(slot.model_dump(by_alias=True).keys()) == {
-            "questionNumber",
-            "xMm",
-            "yMm",
-            "studentAnswerRectMm",
-        }
+    area = template.essay_area_rect_mm
+    assert area is not None
+    assert area.w >= 150
+    assert area.h >= 30
 
 
 # --------------------------------------------------------------------------- #
@@ -118,23 +113,32 @@ def test_schema_rejects_invalid_option_label() -> None:
         Draft202012Validator(load_schema()).validate(raw)
 
 
-def test_pydantic_rejects_missing_student_answer_rect() -> None:
+def test_schema_rejects_missing_essay_area() -> None:
+    """Area esai wajib ada di kontrak (boleh null, tapi tidak boleh hilang)."""
     raw = load_example()
-    del raw["essaySlots"][0]["studentAnswerRectMm"]
-    with pytest.raises(ValidationError):
-        ExamTemplate.model_validate(raw)
+    del raw["essayAreaRectMm"]
+    with pytest.raises(Exception):
+        Draft202012Validator(load_schema()).validate(raw)
+
+
+def test_schema_rejects_legacy_essay_slots() -> None:
+    """Model lama (essaySlots per nomor) sudah tidak berlaku."""
+    raw = load_example()
+    raw["essaySlots"] = []
+    with pytest.raises(Exception):
+        Draft202012Validator(load_schema()).validate(raw)
 
 
 def test_schema_rejects_legacy_essay_score_circles() -> None:
     """Lingkaran skor esai sudah dihapus — schema harus menolaknya."""
     raw = load_example()
-    raw["essaySlots"][0]["valueOptions"] = []
+    raw["essayAreaRectMm"]["valueOptions"] = []
     with pytest.raises(Exception):
         Draft202012Validator(load_schema()).validate(raw)
 
 
 def test_pydantic_rejects_extra_field() -> None:
     raw = load_example()
-    raw["essaySlots"][0]["unexpected"] = True
+    raw["essayAreaRectMm"]["unexpected"] = True
     with pytest.raises(ValidationError):
         ExamTemplate.model_validate(raw)

@@ -109,18 +109,14 @@ export interface MultipleChoiceSlot {
 }
 
 /**
- * Satu nomor esai di LJK.
+ * Area jawaban esai di LJK.
  *
- * Hanya ada **satu** sub-bagian: area kosong tempat siswa menulis jawaban.
- * Skor esai **tidak** ditulis di kertas — guru menilai sendiri di aplikasi,
- * lalu memasukkan hasilnya per nomor.
+ * Hanya **satu** area kosong untuk seluruh soal esai — tidak ada nomor per
+ * soal di kertas, siswa menomori sendiri jawabannya. Skor esai **tidak**
+ * ditulis di kertas: guru menilai sendiri di aplikasi, lalu memasukkan
+ * hasilnya per nomor.
  */
-export interface EssaySlot {
-  questionNumber: number;
-  xMm: number;
-  yMm: number;
-  studentAnswerRectMm: RectMm;
-}
+export type EssayAreaRectMm = RectMm | null;
 
 export interface ExamTemplate {
   id: string;
@@ -133,7 +129,8 @@ export interface ExamTemplate {
   fiducials: Fiducial[];
   nameCropRectMm: RectMm;
   multipleChoiceSlots: MultipleChoiceSlot[];
-  essaySlots: EssaySlot[];
+  /** null bila ujian tidak punya soal esai. */
+  essayAreaRectMm: EssayAreaRectMm;
 }
 
 /* ------------------------------------------------------------------ *
@@ -166,12 +163,6 @@ export interface EssayMark {
   pointsAwarded: number;
 }
 
-/** Potongan gambar area jawaban esai, supaya guru bisa membaca tulisan tangan. */
-export interface EssayAnswerCrop {
-  questionNumber: number;
-  imageDataUrl: string;
-}
-
 export interface OMRScanResponse {
   scanId: string;
   sourceDevice: "MOBILE_CAMERA" | "DESKTOP_SCANNER";
@@ -179,8 +170,8 @@ export interface OMRScanResponse {
   studentNameCropUrl: string; // Potongan gambar tulisan tangan nama siswa
   fullWarpedImageUrl: string; // Gambar LJK utuh hasil 4-point transform
   mcAnswers: DetectedMCAnswer[];
-  /** Skor esai dinilai guru di aplikasi — mesin hanya memotong areanya. */
-  essayCrops: EssayAnswerCrop[];
+  /** Skor esai dinilai guru di aplikasi — mesin hanya memotong satu area. */
+  essayAreaCropUrl: string | null;
 }
 
 export interface GradedStudentRecord {

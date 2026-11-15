@@ -52,24 +52,26 @@ def test_empat_fiducial_tergambar_dengan_ukuran_benar(pdf: tuple[Path, dict]) ->
     """PRD FR-1.3: kiri-atas 14 mm, tiga sudut lain 10 mm."""
     path, template = pdf
     sizes = sorted(round(w / MM_TO_PT, 3) for _, _, w, _ in rects(path))
-    # 4 fiducial + 2 kotak garis putus (nama & kelas) + 1 kotak petunjuk + 5 kotak jawaban esai
+    # 4 fiducial + kotak nama (90) + kotak kelas (80) + kotak petunjuk (176)
+    # + satu area esai (176)
     assert sizes.count(14.0) == 1, "harus ada tepat satu fiducial 14 mm"
     assert sizes.count(10.0) == 3, "harus ada tiga fiducial 10 mm"
-    assert sizes.count(164.0) == 5, "harus ada lima kotak jawaban esai"
+    assert sizes.count(176.0) == 2, "harus ada kotak petunjuk + satu area esai"
 
 
-def test_kotak_jawaban_esai_di_posisi_yang_benar(pdf: tuple[Path, dict]) -> None:
-    """Kotak jawaban esai harus berada tepat di studentAnswerRectMm template."""
+def test_area_esai_di_posisi_yang_benar(pdf: tuple[Path, dict]) -> None:
+    """Area esai harus berada tepat di essayAreaRectMm template."""
     path, template = pdf
     page_h_pt = template["pageHeightMm"] * MM_TO_PT
-    expected = set()
-    for slot in template["essaySlots"]:
-        rect = slot["studentAnswerRectMm"]
-        x = rect["x"] * MM_TO_PT
-        y = page_h_pt - (rect["y"] + rect["h"]) * MM_TO_PT
-        expected.add((round(x, 2), round(y, 2)))
-    drawn = {(round(x, 2), round(y, 2)) for x, y, w, h in rects(path) if approx(w / MM_TO_PT, 164.0, 0.1)}
-    assert expected.issubset(drawn), "kotak jawaban esai di PDF tidak cocok dengan template"
+    rect = template["essayAreaRectMm"]
+    x = rect["x"] * MM_TO_PT
+    y = page_h_pt - (rect["y"] + rect["h"]) * MM_TO_PT
+    drawn = {
+        (round(x, 2), round(y, 2))
+        for x, y, w, h in rects(path)
+        if approx(w / MM_TO_PT, rect["w"], 0.1) and approx(h / MM_TO_PT, rect["h"], 0.1)
+    }
+    assert (round(x, 2), round(y, 2)) in drawn, "area esai di PDF tidak cocok dengan template"
 
 
 def test_fiducial_kiri_atas_di_poin_atas_kiri(pdf: tuple[Path, dict]) -> None:
