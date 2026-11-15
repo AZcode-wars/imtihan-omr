@@ -1,0 +1,329 @@
+"""Generator koordinat LJK — SATU-SATUNYA sumber kebenaran geometri.
+
+Modul ini определя letak setiap elemen LJK dalam **milimeter** dan
+menghasilkan objek ``ExamTemplate`` yang persis cocok dengan JSON Schema
+``packages/shared-schemas/schema/exam-template.schema.json``.
+
+Dari koordinat yang sama inilah dua hal lain diturunkan:
+
+* ``pdf.py``    → PDF LJK siap cetak (ReportLab)
+* ``synth.py``  → LJK sintetis + ground truth untuk menguji engine OMR
+
+Jadi tidak ada kemungkinan "cetak ≠ deteksi": ketiganya membaca sumber yang sama.
+
+Aturan geometri (PRD FR-1.2, FR-1.3, FR-1.5)
+------------------------------------------------
+* Jarak antar pusat antar bubble minimal **8,5 mm** — dipakai persis sebagai
+  jarak tata letak, sehingga ``bubblePitchMm`` bukan angka teoretis melainkan
+  jarak yang benar-benar dipakai.
+* Diameter bubble **4,5 mm**.
+* 4 fiducial marker; yang **kiri-atas 14 × 14 mm** (penanda orientasi),
+  tiga sudut lain **10 × 10 mm**.
+* 2 kolom untuk Pilihan Ganda.
+* Zona esai punya dua sub-bagian dengan koordinat terpisah:
+  area kosong jawaban siswa, dan lingkaran skor yang diisi guru.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+
+from openomr_schemas import ExamTemplate
+
+# --------------------------------------------------------------------------- #
+# Konstanta tata letak (mm)
+# --------------------------------------------------------------------------- #
+
+PAGE_WIDTH_MM = 210.0
+PAGE_HEIGHT_MM = 297.0
+MARGIN_MM = 10.0
+
+BUBBLE_DIAMETER_MM = 4.5
+BUBBLE_PITCH_MM = 8.5
+
+FIDUCIAL_TL_MM = 14.0
+FIDUCIAL_OTHER_MM = 10.0
+
+COLUMN_COUNT = 2
+COLUMN_X_MM = (14.0, 108.0)
+
+OPTION_LABELS = ("A", "B", "C", "D")
+MC_OPTION_OFFSET_MM = 12.0  # jarak dari x kolom ke pusat option pertama
+
+CONTENT_TOP_MM = 30.0
+NAME_CROP_RECT_MM = {"x": 14.0, "y": 30.0, "w": 90.0, "h": 12.0}
+CLASS_BOX_RECT_MM = {"x": 110.0, "y": 30.0, "w": 80.0, "h": 12.0}
+
+TITLE_Y_MM = 46.0
+MC_START_Y_MM = 52.0
+
+ESSAY_START_PREFERRED_MM = 164.0
+ESSAY_LABEL_X_MM = 14.0
+ESSAY_LABEL_W_MM = 8.0
+ESSAY_ANSWER_X_MM = 24.0
+ESSAY_ANSWER_W_MM = 96.0
+ESSAY_ANSWER_H_MM = 16.0
+ESSAY_ANSWER_H_MIN_MM = 14.0
+ESSAY_SCORE_X_MM = 132.0
+ESSAY_HALF_X_MM = 182.0
+ESSAY_HALF_W_MM = 7.0
+ESSAY_HALF_H_MM = 6.0
+ESSAY_VALUES = (0, 1, 2, 3, 4, 5)
+ESSAY_PITCH_MM = 22.0
+ESSAY_PITCH_MIN_MM = 14.0
+ESSAY_GAP_MM = 8.0
+#: Jarak minimum antara dua blok esai, di luar tinggi kotak jawaban.
+ESSAY_BLOCK_GAP_MM = 4.0
+
+#: Batas bawah isi konten. Fiducial bawah menempati pita y 277-287 mm,
+#: jadi konten harus berhenti 5 mm di atas pita itu (272 mm).
+CONTENT_BOTTOM_MM = PAGE_HEIGHT_MM - MARGIN_MM - 15.0  # 272 mm
+
+
+class TemplateOverflowError(ValueError):
+    """Kombinasi jumlah soal tidak muat di satu halaman A4.
+
+    Pesannya sengaja bisa langsung ditindaklanjuti guru.
+    """
+
+
+# --------------------------------------------------------------------------- #
+# Struktur hasil
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class Layout:
+    """Hasil perhitungan tata letak, dalam milimeter."""
+
+    pg_count: int
+    essay_count: int
+    mc_rows: int
+    mc_last_center_y: float
+    essay_start_y: float
+    essay_pitch: float
+    essay_answer_h: float
+
+    @property
+    def content_bottom_y(self) -> float:
+        if self.essay_count == 0:
+            return self.mc_last_center_y + BUBBLE_DIAMETER_MM / 2
+        return self.essay_start_y + (self.essay_count - 1) * self.essay_pitch + self.essay_answer_h
+
+
+# --------------------------------------------------------------------------- #
+# Perhitungan tata letak
+# --------------------------------------------------------------------------- #
+
+
+def _rows_for(pg_count: int) -> int:
+    """Jumlah baris per kolom. Penomoran berjalan kolom 1 → kolom 2."""
+    return math.ceil(pg_count / COLUMN_COUNT)
+
+
+def compute_layout(pg_count: int, essay_count: int) -> Layout:
+    """Hitung tata letak, atau lempar ``TemplateOverflowError`` bila tidak muat.
+
+    Strategi: jarak antar pusat bubble (8,5 mm) dan tinggi minimum kotak
+    jawaban esai (10 mm) adalah batas bawah yang tidak boleh dilanggar
+    karena keduanya memengaruhi keterbacaan OMR dan ruang tulis siswa.
+    """
+    if pg_count < 1:
+        raise ValueError("pg_count minimal 1")
+    if essay_count < 0:
+        raise ValueError("essay_count tidak boleh negatif")
+
+    rows = _rows_for(pg_count)
+    mc_last_center_y = MC_START_Y_MM + (rows - 1) * BUBBLE_PITCH_MM
+
+    if essay_count == 0:
+        layout = Layout(pg_count, essay_count, rows, mc_last_center_y, 0.0, 0.0, 0.0)
+        if layout.content_bottom_y > CONTENT_BOTTOM_MM:
+            raise TemplateOverflowError(_overflow_message(pg_count, essay_count, 0))
+        return layout
+
+    # Blok esai dikompresi bertahap sampai muat: jarak antar blok dulu,
+    # baru tinggi kotak jawaban. Jarak antar blok WAJIB >= tinggi kotak + 4 mm,
+    # kalau tidak kotak jawaban antar nomor akan saling tumpang tindih.
+    # Zona esai menempel di bawah zona PG + celah — bukan di posisi tetap —
+    # supaya ruang kosong tidak terbuang.
+    for answer_h in (ESSAY_ANSWER_H_MM, ESSAY_ANSWER_H_MIN_MM):
+        min_pitch = answer_h + ESSAY_BLOCK_GAP_MM
+        for pitch in (ESSAY_PITCH_MM, 20.0, 18.0, 16.0, ESSAY_PITCH_MIN_MM):
+            if pitch < min_pitch:
+                continue
+            start = mc_last_center_y + ESSAY_GAP_MM
+            bottom = start + (essay_count - 1) * pitch + answer_h
+            if bottom <= CONTENT_BOTTOM_MM:
+                return Layout(
+                    pg_count, essay_count, rows, mc_last_center_y, start, pitch, answer_h
+                )
+
+    raise TemplateOverflowError(_overflow_message(pg_count, essay_count, rows))
+
+
+def _overflow_message(pg_count: int, essay_count: int, rows: int) -> str:
+    return (
+        f"{pg_count} soal Pilihan Ganda ({rows} baris) + {essay_count} soal esai "
+        f"tidak muat di satu halaman A4 dengan jarak antar pusat "
+        f"{BUBBLE_PITCH_MM} mm. Kurangi jumlah soal esai, atau cetak pada dua halaman."
+    )
+
+
+def max_essay_count_for(pg_count: int) -> int:
+    """Berapa soal esai maksimum yang masih muat bersama ``pg_count`` soal PG.
+
+    Dipakai antarmuka ``/setup`` untuk memberi tahu guru sebelum_save.
+    """
+    for n in range(0, 11):
+        try:
+            compute_layout(pg_count, n)
+        except TemplateOverflowError:
+            return max(0, n - 1)
+    return 10
+
+
+# --------------------------------------------------------------------------- #
+# Pembuatan ExamTemplate
+# --------------------------------------------------------------------------- #
+
+
+def build_template(
+    exam_id: str = "exam-1",
+    template_id: str = "tpl-1",
+    pg_count: int = 25,
+    essay_count: int = 5,
+) -> dict:
+    """Bangun objek ``ExamTemplate`` (siap diserialisasi ke JSON).
+
+    Mengembalikan dict biasa — pydantic memvalidasi bentuknya saat diimpor.
+    """
+    layout = compute_layout(pg_count, essay_count)
+
+    fiducials = [
+        {
+            "corner": "TOP_LEFT",
+            "sizeMm": FIDUCIAL_TL_MM,
+            "xMm": MARGIN_MM,
+            "yMm": MARGIN_MM,
+        },
+        {
+            "corner": "TOP_RIGHT",
+            "sizeMm": FIDUCIAL_OTHER_MM,
+            "xMm": PAGE_WIDTH_MM - MARGIN_MM - FIDUCIAL_OTHER_MM,
+            "yMm": MARGIN_MM,
+        },
+        {
+            "corner": "BOTTOM_LEFT",
+            "sizeMm": FIDUCIAL_OTHER_MM,
+            "xMm": MARGIN_MM,
+            "yMm": PAGE_HEIGHT_MM - MARGIN_MM - FIDUCIAL_OTHER_MM,
+        },
+        {
+            "corner": "BOTTOM_RIGHT",
+            "sizeMm": FIDUCIAL_OTHER_MM,
+            "xMm": PAGE_WIDTH_MM - MARGIN_MM - FIDUCIAL_OTHER_MM,
+            "yMm": PAGE_HEIGHT_MM - MARGIN_MM - FIDUCIAL_OTHER_MM,
+        },
+    ]
+
+    mc_slots = []
+    for number in range(1, pg_count + 1):
+        col = (number - 1) // layout.mc_rows
+        row = (number - 1) % layout.mc_rows
+        x = COLUMN_X_MM[col]
+        y = MC_START_Y_MM + row * BUBBLE_PITCH_MM
+        mc_slots.append(
+            {
+                "questionNumber": number,
+                "xMm": x,
+                "yMm": y,
+                "options": [
+                    {
+                        "label": label,
+                        "xMm": x + MC_OPTION_OFFSET_MM + k * BUBBLE_PITCH_MM,
+                        "yMm": y,
+                    }
+                    for k, label in enumerate(OPTION_LABELS)
+                ],
+            }
+        )
+
+    essay_slots = []
+    for number in range(1, essay_count + 1):
+        top = layout.essay_start_y + (number - 1) * layout.essay_pitch
+        answer_y = top + (layout.essay_answer_h - ESSAY_ANSWER_H_MM) / 2
+        essay_slots.append(
+            {
+                "questionNumber": number,
+                "xMm": ESSAY_LABEL_X_MM,
+                "yMm": top,
+                # Sub-bagian 1 — area kosong untuk tulisan siswa (TIDAK dibaca mesin)
+                "studentAnswerRectMm": {
+                    "x": ESSAY_ANSWER_X_MM,
+                    "y": round(answer_y, 3),
+                    "w": ESSAY_ANSWER_W_MM,
+                    "h": layout.essay_answer_h,
+                },
+                # Sub-bagian 2 — lingkaran skor guru (dibaca mesin)
+                "valueOptions": [
+                    {
+                        "value": value,
+                        "xMm": ESSAY_SCORE_X_MM + value * BUBBLE_PITCH_MM,
+                        "yMm": round(top + layout.essay_answer_h / 2, 3),
+                    }
+                    for value in ESSAY_VALUES
+                ],
+                "halfModifierOffset": {
+                    "xMm": ESSAY_HALF_X_MM,
+                    "yMm": round(top + layout.essay_answer_h / 2, 3),
+                },
+            }
+        )
+
+    return {
+        "id": template_id,
+        "examId": exam_id,
+        "pageWidthMm": PAGE_WIDTH_MM,
+        "pageHeightMm": PAGE_HEIGHT_MM,
+        "columnCount": COLUMN_COUNT,
+        "bubbleDiameterMm": BUBBLE_DIAMETER_MM,
+        "bubblePitchMm": BUBBLE_PITCH_MM,
+        "fiducials": fiducials,
+        "nameCropRectMm": dict(NAME_CROP_RECT_MM),
+        "multipleChoiceSlots": mc_slots,
+        "essaySlots": essay_slots,
+    }
+
+
+def build_validated_template(
+    exam_id: str = "exam-1",
+    template_id: str = "tpl-1",
+    pg_count: int = 25,
+    essay_count: int = 5,
+) -> ExamTemplate:
+    """``build_template`` yang divalidasi model pydantic."""
+    return ExamTemplate.model_validate(
+        build_template(exam_id, template_id, pg_count, essay_count)
+    )
+
+
+__all__ = [
+    "BUBBLE_DIAMETER_MM",
+    "BUBBLE_PITCH_MM",
+    "CONTENT_BOTTOM_MM",
+    "ESSAY_ANSWER_H_MM",
+    "ESSAY_PITCH_MM",
+    "FIDUCIAL_OTHER_MM",
+    "FIDUCIAL_TL_MM",
+    "Layout",
+    "MARGIN_MM",
+    "PAGE_HEIGHT_MM",
+    "PAGE_WIDTH_MM",
+    "TemplateOverflowError",
+    "build_template",
+    "build_validated_template",
+    "compute_layout",
+    "max_essay_count_for",
+]

@@ -447,6 +447,26 @@ Tombol mengunduh CSV dengan kolom: `NIS, Nama, Skor PG, Skor Esai, Nilai Akhir, 
 | Area skor guru | 6 lingkaran ⌀ 4,5 mm + 1 kotak `[+.5]` | Di kanan area jawaban |
 | Margin cetak | 10 mm | Overlay opsional |
 
+### Kapasitas satu halaman A4
+
+Dibatasi jarak antar pusat antar bubble **8,5 mm** (PRD FR-1.2) — bukan pilihan desain. Angka di bawah hasil implementasi (`packages/omr-engine`, `compute_layout`):
+
+| Soal esai | PG maksimum |
+|---|---|
+| 0 | 50 |
+| 1 | 48 |
+| 2 | 44 |
+| 3 | 40 |
+| 4 | 34 |
+| 5 | 30 |
+| 6 | 26 |
+| 7 | 22 |
+| 8 | 18 |
+| 9 | 14 |
+| 10 | 10 |
+
+Kombinasi yang melebihi batas **ditolak sistem** dengan pesan yang bisa ditindaklanjuti guru. Layar `/setup` **wajib** menampilkan batas ini secara langsung dari `max_essay_count_for(pgCount)` — bukan hanya lewat pesan error saat menekan tombol cetak.
+
 ### Bentuk blok esai (sub-bagian ganda)
 
 Setiap nomor esai punya **dua area dengan koordinat terpisah**, supaya OMR membaca lingkaran skor tanpa mengotori tulisan tangan siswa:

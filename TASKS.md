@@ -61,11 +61,36 @@
   4. **Keputusan yang perlu kamu konfirmasi:** `ROUND_HALF_UP` saya implementasikan **menjauh dari nol** (2,5 → 3 dan −2,5 → −3). Java/`.NET` memakai arah berbeda untuk negatif; kalau mau `ToPositiveInfinity`, bilang saja.
   5. **Catatan:** `shadcn` CLI dipindah ke `devDependencies` (itu CLI, bukan runtime). `@vitejs/plugin-react` + `jsdom` + testing-library **belum** dipasang — akan dipakai Task 6 untuk test komponen; peer-conflict-nya dengan rantai `@babel` milik CLI `shadcn` perlu diselesaikan saat itu (opsi: `--legacy-peer-deps`, atau lepaskan `shadcn` dari tree saat test).
 
-## [ ] Task 3 — Fase 2: Engine template & PDF
-**Lakukan:** `omr/template.py` (sumber koordinat: fiducial 14/10 mm, bubble ⌀4,5 mm pitch 8,5 mm, 2 kolom, zona nama, zona esai 2 sub-bagian) · `omr/pdf.py` (ReportLab) · `omr/synth.py` (LJK sintetis + `truth.json`) · CLI `python -m omr.synth`.
+## [x] Task 3 — Fase 2: Engine template & PDF ✅
+**Lakukan:** `omr_engine/template.py` (sumber koordinat) · `omr_engine/pdf.py` (ReportLab) · `omr_engine/synth.py` (LJK sintetis + ground truth, OpenCV) · CLI `python -m omr_engine.synth`.
 
-- **Target:** menghasilkan `ljk.pdf` + `template.json` (valid schema) + `synth.png` + `truth.json` dari koordinat identik; pytest hijau.
-- **Tinjau:** **`prototype/previews/05-ljk-a4.png` sebagai acuan tampilan** — bandingkan hasil `synth.png`/PDF dengan preview itu; cek koordinat fiducial & bubble di dalam batas kertas.
+**Hasil:**
+- **`template.py` = sumber kebenaran geometri.** Semua koordinat dalam **milimeter**, jarak antar pusat antar bubble **persis 8,5 mm** (bukan angka teoretis — `bubblePitchMm` = jarak yang benar-benar dipakai). Menghasilkan dict yang valid menurut JSON Schema kontrak.
+- **`pdf.py`** — PDF LJK dari koordinat template. MediaBox `595.2756 × 841.8898` pt = tepat A4. Ditulis **tanpa kompresi** supaya koordinatnya bisa diverifikasi.
+- **`synth.py`** — LJK sintetis 840 × 1188 px (4 px/mm) + `truth.json`. Distribusi deterministik: kelipatan 7 → `EMPTY`, 11 → `MULTIPLE`, 13 → `LOW_CONFIDENCE`, sisanya `VALID`; skor esai 0–5 + modifier `+0,5`.
+- CLI menghasilkan 4 berkas: `template.json`, `sheet.pdf`, `sheet.png`, `truth.json`.
+- **45 test pytest** — termasuk `test_pdf_geometry.py` yang **membandingkan PDF dengan template**: posisi 4 fiducial & 5 kotak jawaban esai harus cocok, dan jumlah kurva ≥ jumlah lingkaran.
+- Engine sekarang depend pada `openomr-schemas` (editable) → kontrak benar-benar dipakai, bukan diduplikasi.
+
+**Commit:** `feat(3): engine template + PDF + LJK sintetis`
+
+**Temuan produk yang perlu kamu putuskan:**
+> **Tidak semua kombinasi jumlah soal muat di satu halaman A4.** Dengan jarak antar pusat 8,5 mm (PRD FR-1.2), batasnya: **0 esai → 50 PG · 5 esai → 30 PG · 10 esai → 10 PG**. Kombinasi lebih besar **ditolak sistem** dengan pesan actionable. Layar `/setup` (Task 6) wajib menampilkan batas ini sebelum guru mencetak. Dokumentasi sudah masuk `docs/screen_specs.md` §8 dan PRD FR-1.1.
+> Kalau ini tidak bisa diterima, alternatifnya **dua halaman** (butuh dukungan multi-page di template, engine, dan pratinjau) — itu keputusan produk, bukan teknis.
+
+**Bug yang ketemu & diperbaiki saat pengerjaan:**
+- Zona esai dipaksa mulai di y=164 → ruang 78 mm terbuang. Sekarang menempel di bawah zona PG + celah.
+- Kompresi tata letak bisa membuat **kotak jawaban esai saling tumpang tindih** (tinggi 16 mm, jarak 14 mm). Sekarang jarak antar blok **wajib ≥ tinggi kotak + 4 mm**.
+- Batas bawah konten awalnya 282 mm → konten bisa menabrak pita fiducial bawah (277–287 mm). Sekarang 272 mm.
+- Judul "II. ZONA SKOR ESAI" menabrak baris PG 13. Sekarang posisinya relatif terhadap zona esai.
+- **Kotak "KELAS / NO. ABSEN" digambar di PDF tapi tidak di LJK sintetis** — sekarang keduanya pakai konstanta yang sama (`CLASS_BOX_RECT_MM` di `template.py`).
+
+- **Target:** ✅ `uv run pytest` → 45/45 hijau · ✅ CLI menghasilkan 4 berkas · ✅ `template.json` lolos JSON Schema · ✅ PDF = A4, 1 halaman, koordinat cocok template · ✅ LJK sintetis terverifikasi visual
+- **Tinjau:**
+  1. `packages/omr-engine/out/sheet.png` — bandingkan dengan `prototype/previews/05-ljk-a4.png`. Seharusnya ada: 4 fiducial (kiri-atas lebih besar), zona nama, 2 kolom 25 PG, 5 blok esai dengan kotak tulis + 6 lingkaran + `[.5]`.
+  2. `out/truth.json` — cek status per nomor (7/14/21 kosong, 11/22 dobel, 13 arsiran tipis).
+  3. `src/omr_engine/template.py` — baca `compute_layout()`: urutan kompresi (tinggi kotak lalu jarak antar blok) dan syarat `pitch >= tinggi + 4`.
+  4. `src/omr_engine/synth.py` — `plan_answers()` menentukan ground truth; Task 4 akan menguji engine terhadap file ini.
 
 ## [ ] Task 4 — Fase 3: Engine pembacaan citra
 **Lakukan:** `omr/imaging.py` (deteksi 4 fiducial, verifikasi orientasi, 4-point transform ke 800×1100, adaptive threshold) · `omr/grade.py` (rasio piksel → `VALID`/`EMPTY`/`MULTIPLE`/`LOW_CONFIDENCE`, baca zona esai, crop nama).
@@ -135,5 +160,6 @@
 |---|---|---|---|
 | 1 — Fondasi repo | ✅ | `02bceca` | Next 16.4.6 / Tailwind v4.3.3 / shadcn radix-nova / Python 3.13.5. 17/17 token identik. Modul Python bernama `omr_engine` (bukan `omr` — nama device cadangan Windows). |
 | 1 — perbaikan kontras | ✅ | `9b718e1` | Label warna di halaman preview pakai pasangan foreground terhitung (bukan `mix-blend-difference`). Aturan kontras formal + larangan `brand/500` sebagai latar teks ditambahkan ke `docs/design_tokens.md` §11.1–11.2. |
-| 2 — Kontrak & logika | ✅ | `feat(2)` | JSON Schema `ExamTemplate` = kontrak tunggal + cermin TS/Pydantic + fixture. 12 test kontrak Python, 36 test vitest scoring. `shadcn` CLI pindah ke devDependencies. |
+| 2 — Kontrak & logika | ✅ | `713e0f3` | JSON Schema `ExamTemplate` = kontrak tunggal + cermin TS/Pydantic + fixture. 12 test kontrak Python, 36 test vitest scoring. `shadcn` CLI pindah ke devDependencies. |
+| 3 — Engine template & PDF | ✅ | `feat(3)` | `template.py` (sumber koordinat mm) → `pdf.py` (ReportLab, A4) + `synth.py` (LJK sintetis + ground truth, OpenCV). 45 test pytest, termasuk PDF-vs-template. Kapasitas halaman ditemukan: 0 esai → 50 PG, 5 esai → 30 PG, 10 esai → 10 PG. |
 | | | | |

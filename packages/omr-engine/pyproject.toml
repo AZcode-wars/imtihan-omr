@@ -11,6 +11,7 @@ dependencies = [
     "fastapi>=0.163.0",
     "numpy>=2.4.6",
     "opencv-python-headless>=5.0.0.93",
+    "openomr-schemas",
     "pydantic>=2.14.3",
     "python-multipart>=0.0.33",
     "reportlab>=5.1.0",
@@ -24,6 +25,10 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "jsonschema>=4.26.0",
     "pytest>=9.2.0",
     "ruff>=0.17.5",
 ]
+
+[tool.uv.sources]
+openomr-schemas = { path = "../shared-schemas", editable = true }

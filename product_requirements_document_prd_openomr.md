@@ -52,6 +52,7 @@ open-omr/
 
 ### FR-1: Generator Template LJK Dinamis
 * **FR-1.1:** Guru dapat membuat template LJK berukuran standar **A4 (210 x 297 mm)** dengan menentukan jumlah soal Pilihan Ganda (misal: 1–50 soal, opsi tetap **A, B, C, D**) dan jumlah soal Esai (0–10 soal).
+  * **Catatan kapasitas satu halaman (hasil implementasi, `packages/omr-engine`):** dengan jarak antar pusat antar bubble minimal **8,5 mm** (FR-1.2), A4 hanya menampung certain kombinasi. Batas PG maksimum per jumlah esai: **0 esai → 50 PG · 5 esai → 30 PG · 10 esai → 10 PG**. Kombinasi yang melebihi batas **ditolak sistem dengan pesan yang bisa ditindaklanjuti guru**, bukan menumpuk diam-diam. Antarmuka `/setup` harus menampilkan batas ini sebelum guru mencetak.
 * **FR-1.2:** Sistem menyusun soal ke dalam tata letak **2 kolom** dengan diameter lingkaran `4.5–5 mm` dan jarak antar pusat lingkaran minimal `8.5 mm` untuk mencegah tumpang tindih (*bleeding*).
 * **FR-1.3:** Setiap LJK wajib memiliki **4 Fiducial Markers** (kotak hitam solid di keempat sudut zona aktif), dengan ukuran kotak kiri-atas (`14x14 mm`) lebih besar dari tiga sudut lainnya (`10x10 mm`) untuk deteksi orientasi otomatis.
 * **FR-1.4:** Bagian atas zona aktif menyediakan kolom isian tulis tangan untuk **Nama Siswa** dan **Kelas**.
