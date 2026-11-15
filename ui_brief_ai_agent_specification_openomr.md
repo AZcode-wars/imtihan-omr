@@ -159,12 +159,20 @@ export interface DetectedMCAnswer {
   rawCandidates?: OptionLabel[];
 }
 
-export interface DetectedEssayScore {
+/** Hasil penilaian guru atas satu soal esai (skor esai tidak dibaca dari kertas). */
+export type EssayOutcome = 'CORRECT' | 'INCORRECT' | 'PARTIAL';
+
+export interface EssayMark {
   questionNumber: number;
-  baseScore: number;            // 0 - 5
-  hasHalfModifier: boolean;     // true jika lingkaran [+.5] terarsir
-  totalScore: number;           // baseScore + (hasHalfModifier ? 0.5 : 0)
-  status: BubbleReadStatus;
+  maxScore: number;              // Poin penuh bila jawaban ini dianggap benar
+  outcome: EssayOutcome;
+  pointsAwarded: number;         // CORRECT = maxScore, INCORRECT = 0, PARTIAL = nilai guru
+}
+
+/** Potongan gambar area jawaban esai, supaya guru bisa membaca tulisan tangan. */
+export interface EssayAnswerCrop {
+  questionNumber: number;
+  imageDataUrl: string;
 }
 
 export interface OMRScanResponse {
@@ -174,7 +182,7 @@ export interface OMRScanResponse {
   studentNameCropUrl: string;   // Potongan gambar tulisan tangan nama siswa
   fullWarpedImageUrl: string;   // Gambar LJK utuh hasil 4-point transform
   mcAnswers: DetectedMCAnswer[];
-  essayScores: DetectedEssayScore[];
+  essayCrops: EssayAnswerCrop[];  // Skor esai dinilai guru di aplikasi
 }
 
 export interface GradedStudentRecord {

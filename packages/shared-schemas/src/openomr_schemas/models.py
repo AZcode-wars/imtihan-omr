@@ -85,28 +85,18 @@ class MultipleChoiceSlot(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
-class EssayValueSlot(BaseModel):
-    value: float = Field(ge=0)
-    x_mm: float = Field(ge=0, alias="xMm")
-    y_mm: float = Field(ge=0, alias="yMm")
-
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-
 class EssaySlot(BaseModel):
     """Satu nomor esai.
 
-    Dua sub-bagian dengan koordinat terpisah:
-    ``student_answer_rect_mm`` = area kosong untuk tulisan siswa (tidak dibaca mesin);
-    ``value_options`` + ``half_modifier_offset`` = lingkaran skor guru (dibaca mesin).
+    Hanya ada satu sub-bagian: area kosong tempat siswa menulis jawaban.
+    Skor esai tidak ditulis di kertas — guru menilai sendiri di aplikasi,
+    lalu memasukkan hasilnya per nomor.
     """
 
     question_number: int = Field(ge=1, alias="questionNumber")
     x_mm: float = Field(ge=0, alias="xMm")
     y_mm: float = Field(ge=0, alias="yMm")
     student_answer_rect_mm: RectMm = Field(alias="studentAnswerRectMm")
-    value_options: list[EssayValueSlot] = Field(min_length=1, alias="valueOptions")
-    half_modifier_offset: PointMm = Field(alias="halfModifierOffset")
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -206,14 +196,28 @@ class DetectedMCAnswer(BaseModel):
     raw_candidates: list[OptionLabel] | None = Field(default=None, alias="rawCandidates")
 
 
-class DetectedEssayScore(BaseModel):
+class EssayAnswerCrop(BaseModel):
+    """Potongan gambar area jawaban esai, supaya guru bisa membaca tulisan tangan."""
+
     model_config = ConfigDict(extra="forbid")
 
     question_number: int = Field(ge=1, alias="questionNumber")
-    base_score: float = Field(alias="baseScore")
-    has_half_modifier: bool = Field(alias="hasHalfModifier")
-    total_score: float = Field(alias="totalScore")
-    status: BubbleReadStatus
+    image_data_url: str = Field(alias="imageDataUrl")
+
+
+class EssayMark(BaseModel):
+    """Hasil penilaian guru atas satu soal esai.
+
+    Memilih "Benar" otomatis mengisi ``points_awarded`` dengan ``max_score``;
+    memilih "Salah" mengisinya dengan 0. Nilai di tengah berarti dinilai sebagian.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    question_number: int = Field(ge=1, alias="questionNumber")
+    max_score: float = Field(gt=0, alias="maxScore")
+    outcome: Literal["CORRECT", "INCORRECT", "PARTIAL"]
+    points_awarded: float = Field(ge=0, alias="pointsAwarded")
 
 
 class OMRScanResponse(BaseModel):
@@ -225,7 +229,8 @@ class OMRScanResponse(BaseModel):
     student_name_crop_url: str = Field(alias="studentNameCropUrl")
     full_warped_image_url: str = Field(alias="fullWarpedImageUrl")
     mc_answers: list[DetectedMCAnswer] = Field(alias="mcAnswers")
-    essay_scores: list[DetectedEssayScore] = Field(alias="essayScores")
+    #: Skor esai dinilai guru di aplikasi — mesin hanya memotong areanya.
+    essay_crops: list[EssayAnswerCrop] = Field(alias="essayCrops")
 
 
 class GradedStudentRecord(BaseModel):
@@ -271,10 +276,10 @@ __all__ = [
     "BubbleReadStatus",
     "Class",
     "DetectedMCAnswer",
-    "DetectedEssayScore",
+    "EssayAnswerCrop",
+    "EssayMark",
     "EssayQuestionConfig",
     "EssaySlot",
-    "EssayValueSlot",
     "ExamConfig",
     "ExamTemplate",
     "Fiducial",

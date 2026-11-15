@@ -1,40 +1,40 @@
 {
-  "id": "tpl-example-25pg-2es",
+  "id": "tpl-example-25pg-5es",
   "examId": "exam-example",
   "pageWidthMm": 210.0,
   "pageHeightMm": 297.0,
   "columnCount": 2,
   "bubbleDiameterMm": 4.5,
-  "bubblePitchMm": 8.5,
+  "bubblePitchMm": 6.0,
   "fiducials": [
     {
       "corner": "TOP_LEFT",
       "sizeMm": 14.0,
-      "xMm": 10.0,
-      "yMm": 10.0
+      "xMm": 8.0,
+      "yMm": 8.0
     },
     {
       "corner": "TOP_RIGHT",
       "sizeMm": 10.0,
-      "xMm": 190.0,
-      "yMm": 10.0
+      "xMm": 192.0,
+      "yMm": 8.0
     },
     {
       "corner": "BOTTOM_LEFT",
       "sizeMm": 10.0,
-      "xMm": 10.0,
-      "yMm": 277.0
+      "xMm": 8.0,
+      "yMm": 279.0
     },
     {
       "corner": "BOTTOM_RIGHT",
       "sizeMm": 10.0,
-      "xMm": 190.0,
-      "yMm": 277.0
+      "xMm": 192.0,
+      "yMm": 279.0
     }
   ],
   "nameCropRectMm": {
     "x": 14.0,
-    "y": 32.0,
+    "y": 30.0,
     "w": 90.0,
     "h": 12.0
   },
@@ -42,675 +42,675 @@
     {
       "questionNumber": 1,
       "xMm": 14.0,
-      "yMm": 60.0,
+      "yMm": 52.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 60.0
+          "xMm": 23.0,
+          "yMm": 52.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 60.0
+          "xMm": 29.0,
+          "yMm": 52.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 60.0
+          "xMm": 35.0,
+          "yMm": 52.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 60.0
+          "xMm": 41.0,
+          "yMm": 52.0
         }
       ]
     },
     {
       "questionNumber": 2,
       "xMm": 14.0,
-      "yMm": 68.5,
+      "yMm": 58.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 68.5
+          "xMm": 23.0,
+          "yMm": 58.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 68.5
+          "xMm": 29.0,
+          "yMm": 58.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 68.5
+          "xMm": 35.0,
+          "yMm": 58.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 68.5
+          "xMm": 41.0,
+          "yMm": 58.0
         }
       ]
     },
     {
       "questionNumber": 3,
       "xMm": 14.0,
-      "yMm": 77.0,
+      "yMm": 64.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 77.0
+          "xMm": 23.0,
+          "yMm": 64.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 77.0
+          "xMm": 29.0,
+          "yMm": 64.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 77.0
+          "xMm": 35.0,
+          "yMm": 64.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 77.0
+          "xMm": 41.0,
+          "yMm": 64.0
         }
       ]
     },
     {
       "questionNumber": 4,
       "xMm": 14.0,
-      "yMm": 85.5,
+      "yMm": 70.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 85.5
+          "xMm": 23.0,
+          "yMm": 70.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 85.5
+          "xMm": 29.0,
+          "yMm": 70.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 85.5
+          "xMm": 35.0,
+          "yMm": 70.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 85.5
+          "xMm": 41.0,
+          "yMm": 70.0
         }
       ]
     },
     {
       "questionNumber": 5,
       "xMm": 14.0,
-      "yMm": 94.0,
+      "yMm": 76.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 94.0
+          "xMm": 23.0,
+          "yMm": 76.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 94.0
+          "xMm": 29.0,
+          "yMm": 76.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 94.0
+          "xMm": 35.0,
+          "yMm": 76.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 94.0
+          "xMm": 41.0,
+          "yMm": 76.0
         }
       ]
     },
     {
       "questionNumber": 6,
       "xMm": 14.0,
-      "yMm": 102.5,
+      "yMm": 82.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 102.5
+          "xMm": 23.0,
+          "yMm": 82.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 102.5
+          "xMm": 29.0,
+          "yMm": 82.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 102.5
+          "xMm": 35.0,
+          "yMm": 82.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 102.5
+          "xMm": 41.0,
+          "yMm": 82.0
         }
       ]
     },
     {
       "questionNumber": 7,
       "xMm": 14.0,
-      "yMm": 111.0,
+      "yMm": 88.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 111.0
+          "xMm": 23.0,
+          "yMm": 88.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 111.0
+          "xMm": 29.0,
+          "yMm": 88.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 111.0
+          "xMm": 35.0,
+          "yMm": 88.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 111.0
+          "xMm": 41.0,
+          "yMm": 88.0
         }
       ]
     },
     {
       "questionNumber": 8,
       "xMm": 14.0,
-      "yMm": 119.5,
+      "yMm": 94.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 119.5
+          "xMm": 23.0,
+          "yMm": 94.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 119.5
+          "xMm": 29.0,
+          "yMm": 94.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 119.5
+          "xMm": 35.0,
+          "yMm": 94.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 119.5
+          "xMm": 41.0,
+          "yMm": 94.0
         }
       ]
     },
     {
       "questionNumber": 9,
       "xMm": 14.0,
-      "yMm": 128.0,
+      "yMm": 100.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 128.0
+          "xMm": 23.0,
+          "yMm": 100.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 128.0
+          "xMm": 29.0,
+          "yMm": 100.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 128.0
+          "xMm": 35.0,
+          "yMm": 100.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 128.0
+          "xMm": 41.0,
+          "yMm": 100.0
         }
       ]
     },
     {
       "questionNumber": 10,
       "xMm": 14.0,
-      "yMm": 136.5,
+      "yMm": 106.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 136.5
+          "xMm": 23.0,
+          "yMm": 106.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 136.5
+          "xMm": 29.0,
+          "yMm": 106.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 136.5
+          "xMm": 35.0,
+          "yMm": 106.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 136.5
+          "xMm": 41.0,
+          "yMm": 106.0
         }
       ]
     },
     {
       "questionNumber": 11,
       "xMm": 14.0,
-      "yMm": 145.0,
+      "yMm": 112.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 145.0
+          "xMm": 23.0,
+          "yMm": 112.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 145.0
+          "xMm": 29.0,
+          "yMm": 112.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 145.0
+          "xMm": 35.0,
+          "yMm": 112.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 145.0
+          "xMm": 41.0,
+          "yMm": 112.0
         }
       ]
     },
     {
       "questionNumber": 12,
       "xMm": 14.0,
-      "yMm": 153.5,
+      "yMm": 118.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 153.5
+          "xMm": 23.0,
+          "yMm": 118.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 153.5
+          "xMm": 29.0,
+          "yMm": 118.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 153.5
+          "xMm": 35.0,
+          "yMm": 118.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 153.5
+          "xMm": 41.0,
+          "yMm": 118.0
         }
       ]
     },
     {
       "questionNumber": 13,
       "xMm": 14.0,
-      "yMm": 162.0,
+      "yMm": 124.0,
       "options": [
         {
           "label": "A",
-          "xMm": 26.0,
-          "yMm": 162.0
+          "xMm": 23.0,
+          "yMm": 124.0
         },
         {
           "label": "B",
-          "xMm": 34.5,
-          "yMm": 162.0
+          "xMm": 29.0,
+          "yMm": 124.0
         },
         {
           "label": "C",
-          "xMm": 43.0,
-          "yMm": 162.0
+          "xMm": 35.0,
+          "yMm": 124.0
         },
         {
           "label": "D",
-          "xMm": 51.5,
-          "yMm": 162.0
+          "xMm": 41.0,
+          "yMm": 124.0
         }
       ]
     },
     {
       "questionNumber": 14,
-      "xMm": 108.0,
-      "yMm": 60.0,
+      "xMm": 62.0,
+      "yMm": 52.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 60.0
+          "xMm": 71.0,
+          "yMm": 52.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 60.0
+          "xMm": 77.0,
+          "yMm": 52.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 60.0
+          "xMm": 83.0,
+          "yMm": 52.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 60.0
+          "xMm": 89.0,
+          "yMm": 52.0
         }
       ]
     },
     {
       "questionNumber": 15,
-      "xMm": 108.0,
-      "yMm": 68.5,
+      "xMm": 62.0,
+      "yMm": 58.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 68.5
+          "xMm": 71.0,
+          "yMm": 58.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 68.5
+          "xMm": 77.0,
+          "yMm": 58.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 68.5
+          "xMm": 83.0,
+          "yMm": 58.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 68.5
+          "xMm": 89.0,
+          "yMm": 58.0
         }
       ]
     },
     {
       "questionNumber": 16,
-      "xMm": 108.0,
-      "yMm": 77.0,
+      "xMm": 62.0,
+      "yMm": 64.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 77.0
+          "xMm": 71.0,
+          "yMm": 64.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 77.0
+          "xMm": 77.0,
+          "yMm": 64.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 77.0
+          "xMm": 83.0,
+          "yMm": 64.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 77.0
+          "xMm": 89.0,
+          "yMm": 64.0
         }
       ]
     },
     {
       "questionNumber": 17,
-      "xMm": 108.0,
-      "yMm": 85.5,
+      "xMm": 62.0,
+      "yMm": 70.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 85.5
+          "xMm": 71.0,
+          "yMm": 70.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 85.5
+          "xMm": 77.0,
+          "yMm": 70.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 85.5
+          "xMm": 83.0,
+          "yMm": 70.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 85.5
+          "xMm": 89.0,
+          "yMm": 70.0
         }
       ]
     },
     {
       "questionNumber": 18,
-      "xMm": 108.0,
-      "yMm": 94.0,
+      "xMm": 62.0,
+      "yMm": 76.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 94.0
+          "xMm": 71.0,
+          "yMm": 76.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 94.0
+          "xMm": 77.0,
+          "yMm": 76.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 94.0
+          "xMm": 83.0,
+          "yMm": 76.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 94.0
+          "xMm": 89.0,
+          "yMm": 76.0
         }
       ]
     },
     {
       "questionNumber": 19,
-      "xMm": 108.0,
-      "yMm": 102.5,
+      "xMm": 62.0,
+      "yMm": 82.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 102.5
+          "xMm": 71.0,
+          "yMm": 82.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 102.5
+          "xMm": 77.0,
+          "yMm": 82.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 102.5
+          "xMm": 83.0,
+          "yMm": 82.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 102.5
+          "xMm": 89.0,
+          "yMm": 82.0
         }
       ]
     },
     {
       "questionNumber": 20,
-      "xMm": 108.0,
-      "yMm": 111.0,
+      "xMm": 62.0,
+      "yMm": 88.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 111.0
+          "xMm": 71.0,
+          "yMm": 88.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 111.0
+          "xMm": 77.0,
+          "yMm": 88.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 111.0
+          "xMm": 83.0,
+          "yMm": 88.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 111.0
+          "xMm": 89.0,
+          "yMm": 88.0
         }
       ]
     },
     {
       "questionNumber": 21,
-      "xMm": 108.0,
-      "yMm": 119.5,
+      "xMm": 62.0,
+      "yMm": 94.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 119.5
+          "xMm": 71.0,
+          "yMm": 94.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 119.5
+          "xMm": 77.0,
+          "yMm": 94.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 119.5
+          "xMm": 83.0,
+          "yMm": 94.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 119.5
+          "xMm": 89.0,
+          "yMm": 94.0
         }
       ]
     },
     {
       "questionNumber": 22,
-      "xMm": 108.0,
-      "yMm": 128.0,
+      "xMm": 62.0,
+      "yMm": 100.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 128.0
+          "xMm": 71.0,
+          "yMm": 100.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 128.0
+          "xMm": 77.0,
+          "yMm": 100.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 128.0
+          "xMm": 83.0,
+          "yMm": 100.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 128.0
+          "xMm": 89.0,
+          "yMm": 100.0
         }
       ]
     },
     {
       "questionNumber": 23,
-      "xMm": 108.0,
-      "yMm": 136.5,
+      "xMm": 62.0,
+      "yMm": 106.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 136.5
+          "xMm": 71.0,
+          "yMm": 106.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 136.5
+          "xMm": 77.0,
+          "yMm": 106.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 136.5
+          "xMm": 83.0,
+          "yMm": 106.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 136.5
+          "xMm": 89.0,
+          "yMm": 106.0
         }
       ]
     },
     {
       "questionNumber": 24,
-      "xMm": 108.0,
-      "yMm": 145.0,
+      "xMm": 62.0,
+      "yMm": 112.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 145.0
+          "xMm": 71.0,
+          "yMm": 112.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 145.0
+          "xMm": 77.0,
+          "yMm": 112.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 145.0
+          "xMm": 83.0,
+          "yMm": 112.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 145.0
+          "xMm": 89.0,
+          "yMm": 112.0
         }
       ]
     },
     {
       "questionNumber": 25,
-      "xMm": 108.0,
-      "yMm": 153.5,
+      "xMm": 62.0,
+      "yMm": 118.0,
       "options": [
         {
           "label": "A",
-          "xMm": 120.0,
-          "yMm": 153.5
+          "xMm": 71.0,
+          "yMm": 118.0
         },
         {
           "label": "B",
-          "xMm": 128.5,
-          "yMm": 153.5
+          "xMm": 77.0,
+          "yMm": 118.0
         },
         {
           "label": "C",
-          "xMm": 137.0,
-          "yMm": 153.5
+          "xMm": 83.0,
+          "yMm": 118.0
         },
         {
           "label": "D",
-          "xMm": 145.5,
-          "yMm": 153.5
+          "xMm": 89.0,
+          "yMm": 118.0
         }
       ]
     }
@@ -719,95 +719,56 @@
     {
       "questionNumber": 1,
       "xMm": 14.0,
-      "yMm": 185.0,
+      "yMm": 132.0,
       "studentAnswerRectMm": {
-        "x": 20.0,
-        "y": 182.0,
-        "w": 62.0,
-        "h": 14.0
-      },
-      "valueOptions": [
-        {
-          "value": 0,
-          "xMm": 96.0,
-          "yMm": 187.0
-        },
-        {
-          "value": 1,
-          "xMm": 104.5,
-          "yMm": 187.0
-        },
-        {
-          "value": 2,
-          "xMm": 113.0,
-          "yMm": 187.0
-        },
-        {
-          "value": 3,
-          "xMm": 121.5,
-          "yMm": 187.0
-        },
-        {
-          "value": 4,
-          "xMm": 130.0,
-          "yMm": 187.0
-        },
-        {
-          "value": 5,
-          "xMm": 138.5,
-          "yMm": 187.0
-        }
-      ],
-      "halfModifierOffset": {
-        "xMm": 150.0,
-        "yMm": 187.0
+        "x": 26.0,
+        "y": 132.0,
+        "w": 164.0,
+        "h": 24.0
       }
     },
     {
       "questionNumber": 2,
       "xMm": 14.0,
-      "yMm": 205.0,
+      "yMm": 160.0,
       "studentAnswerRectMm": {
-        "x": 20.0,
-        "y": 202.0,
-        "w": 62.0,
-        "h": 14.0
-      },
-      "valueOptions": [
-        {
-          "value": 0,
-          "xMm": 96.0,
-          "yMm": 207.0
-        },
-        {
-          "value": 1,
-          "xMm": 104.5,
-          "yMm": 207.0
-        },
-        {
-          "value": 2,
-          "xMm": 113.0,
-          "yMm": 207.0
-        },
-        {
-          "value": 3,
-          "xMm": 121.5,
-          "yMm": 207.0
-        },
-        {
-          "value": 4,
-          "xMm": 130.0,
-          "yMm": 207.0
-        },
-        {
-          "value": 5,
-          "xMm": 138.5,
-          "yMm": 207.0
-        }
-      ],
-      "halfModifierOffset": {
-        "xMm": 150.0,
-        "yMm": 207.0
+        "x": 26.0,
+        "y": 160.0,
+        "w": 164.0,
+        "h": 24.0
+      }
+    },
+    {
+      "questionNumber": 3,
+      "xMm": 14.0,
+      "yMm": 188.0,
+      "studentAnswerRectMm": {
+        "x": 26.0,
+        "y": 188.0,
+        "w": 164.0,
+        "h": 24.0
+      }
+    },
+    {
+      "questionNumber": 4,
+      "xMm": 14.0,
+      "yMm": 216.0,
+      "studentAnswerRectMm": {
+        "x": 26.0,
+        "y": 216.0,
+        "w": 164.0,
+        "h": 24.0
+      }
+    },
+    {
+      "questionNumber": 5,
+      "xMm": 14.0,
+      "yMm": 244.0,
+      "studentAnswerRectMm": {
+        "x": 26.0,
+        "y": 244.0,
+        "w": 164.0,
+        "h": 24.0
       }
     }
   ]

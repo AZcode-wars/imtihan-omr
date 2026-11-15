@@ -161,15 +161,15 @@ def render_pdf(template: dict, path: str | Path) -> Path:
         for opt in slot["options"]:
             _circle(c, opt["xMm"], opt["yMm"], bubble_d)
 
-    # --- Zona esai: dua sub-bagian ---
-    # Judul seksi diletakkan relatif terhadap zona esai, bukan di koordinat tetap,
-    # supaya tidak menabrak baris PG terakhir.
+    # --- Zona esai: hanya area kosong jawaban siswa ---
+    # Tidak ada lingkaran skor: skor esai dinilai guru di aplikasi.
     essay_slots = template["essaySlots"]
     essay_top = min((s["yMm"] for s in essay_slots), default=0.0)
-    _text(c, "II. ZONA SKOR ESAI — DIISI GURU", 14, essay_top - 2, size_pt=7.5)
+    if essay_slots:
+        _text(c, "II. ZONA JAWABAN ESAI", 14, essay_top - 2, size_pt=7.5)
     for slot in essay_slots:
-        _text(c, f"E{slot['questionNumber']}", 14, slot["yMm"] + 8, size_pt=7)
         rect = slot["studentAnswerRectMm"]
+        _text(c, f"E{slot['questionNumber']}", 14, rect["y"] + rect["h"] / 2, size_pt=7)
         _dashed_rect(c, rect["x"], rect["y"], rect["w"], rect["h"])
         _text(
             c,
@@ -179,22 +179,6 @@ def render_pdf(template: dict, path: str | Path) -> Path:
             size_pt=5,
             color=GUIDE,
         )
-        for value in slot["valueOptions"]:
-            _circle(c, value["xMm"], value["yMm"], bubble_d)
-        half = slot["halfModifierOffset"]
-        c.saveState()
-        c.setStrokeColor(INK)
-        c.setLineWidth(0.5)
-        c.rect(
-            mm_to_pt_x(half["xMm"]),
-            mm_to_pt_y(half["yMm"] + 3),
-            7 * MM_TO_PT,
-            6 * MM_TO_PT,
-            stroke=1,
-            fill=0,
-        )
-        c.restoreState()
-        _text(c, "+.5", half["xMm"] + 1.5, half["yMm"] - 1, size_pt=5)
 
     c.showPage()
     c.save()

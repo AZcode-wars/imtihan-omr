@@ -103,8 +103,13 @@ def _fill_bubble(
 # --------------------------------------------------------------------------- #
 
 
-def plan_answers(pg_count: int, essay_count: int) -> tuple[list[dict], list[dict]]:
-    """Susun rencana jawaban siswa + skor guru (deterministik)."""
+def plan_answers(pg_count: int) -> list[dict]:
+    """Susun rencana jawaban siswa pada bubble PG (deterministik).
+
+    Zona esai **tidak** memiliki tanda skoring di kertas, jadi tidak ada
+    rencana yang perlu dibuat untuknya — skor esai dinilai guru di aplikasi.
+    Yang perlu机器 knows hanyalah di mana area jawabannya.
+    """
     mc: list[dict] = []
     for number in range(1, pg_count + 1):
         if number % 7 == 0:
@@ -147,20 +152,7 @@ def plan_answers(pg_count: int, essay_count: int) -> tuple[list[dict], list[dict
                     "fillRatio": FILL_VALID,
                 }
             )
-
-    essay: list[dict] = []
-    for number in range(1, essay_count + 1):
-        value = (number * 2) % 6
-        has_half = number % 3 == 0
-        essay.append(
-            {
-                "questionNumber": number,
-                "value": value,
-                "halfModifier": has_half,
-                "status": STATUS_VALID,
-            }
-        )
-    return mc, essay
+    return mc
 
 
 # --------------------------------------------------------------------------- #
@@ -296,9 +288,7 @@ def render_synthetic(
         1,
         cv2.LINE_AA,
     )
-    mc_truth, essay_truth = plan_answers(
-        len(template["multipleChoiceSlots"]), len(template["essaySlots"])
-    )
+    mc_truth = plan_answers(len(template["multipleChoiceSlots"]))
     truth_by_number = {t["questionNumber"]: t for t in mc_truth}
 
     for slot in template["multipleChoiceSlots"]:
@@ -322,49 +312,34 @@ def render_synthetic(
             if opt["label"] in marked:
                 _fill_bubble(img, ox, oy, bubble_r, plan["fillRatio"])
 
-    # --- Zona esai ---
-    # Judul seksi relatif terhadap zona esai, supaya tidak menabrak baris PG terakhir.
+    # --- Zona esai: hanya area kosong jawaban siswa (tanpa lingkaran skor) ---
     essay_top = min((s["yMm"] for s in template["essaySlots"]), default=0.0)
-    cv2.putText(
-        img,
-        "II. ZONA SKOR ESAI",
-        (_px(14, px_per_mm), _px(essay_top - 2, px_per_mm)),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.4,
-        ink,
-        1,
-        cv2.LINE_AA,
-    )
-    essay_truth_by_number = {t["questionNumber"]: t for t in essay_truth}
+    if template["essaySlots"]:
+        cv2.putText(
+            img,
+            "II. ZONA JAWABAN ESAI",
+            (_px(14, px_per_mm), _px(essay_top - 2, px_per_mm)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.4,
+            ink,
+            1,
+            cv2.LINE_AA,
+        )
     for slot in template["essaySlots"]:
-        number = slot["questionNumber"]
         rect = slot["studentAnswerRectMm"]
         rx, ry = _px(rect["x"], px_per_mm), _px(rect["y"], px_per_mm)
         rw, rh = _px(rect["w"], px_per_mm), _px(rect["h"], px_per_mm)
         _dashed_rect(img, rx, ry, rw, rh, faint)
         cv2.putText(
             img,
-            f"E{number}",
-            (_px(14, px_per_mm), _px(slot["yMm"], px_per_mm) + 12),
+            f"E{slot['questionNumber']}",
+            (_px(14, px_per_mm), _px(rect["y"] + rect["h"] / 2, px_per_mm) + 4),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.35,
             ink,
             1,
             cv2.LINE_AA,
         )
-        plan = essay_truth_by_number[number]
-        for value in slot["valueOptions"]:
-            vx = _px(value["xMm"], px_per_mm)
-            vy = _px(value["yMm"], px_per_mm)
-            cv2.circle(img, (vx, vy), bubble_r, ink, 1, cv2.LINE_AA)
-            if value["value"] == plan["value"]:
-                _fill_bubble(img, vx, vy, bubble_r, FILL_VALID)
-        half = slot["halfModifierOffset"]
-        hx, hy = _px(half["xMm"], px_per_mm), _px(half["yMm"], px_per_mm)
-        hw, hh = _px(7, px_per_mm), _px(6, px_per_mm)
-        cv2.rectangle(img, (hx, hy - hh // 2), (hx + hw, hy + hh // 2), ink, 1, cv2.LINE_AA)
-        if plan["halfModifier"]:
-            cv2.rectangle(img, (hx + 1, hy - hh // 2 + 1), (hx + hw - 1, hy + hh // 2 - 1), ink, -1)
 
     # --- gangguan realistis (opsional) ---
     if noise_sigma > 0:
@@ -394,7 +369,16 @@ def render_synthetic(
             "noiseSigma": noise_sigma,
         },
         "mc": mc_truth,
-        "essay": essay_truth,
+        # Zona esai tidak bertanda di kertas. Yang dicatat adalah posisi area
+        # jawabannya — mesin harus memotong tepat di area ini supaya guru
+        # bisa membaca tulisan tangan saat menilai.
+        "essay": [
+            {
+                "questionNumber": slot["questionNumber"],
+                "answerRectMm": slot["studentAnswerRectMm"],
+            }
+            for slot in template["essaySlots"]
+        ],
     }
     out_truth = Path(truth_path)
     out_truth.parent.mkdir(parents=True, exist_ok=True)

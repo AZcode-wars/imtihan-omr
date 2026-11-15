@@ -31,14 +31,14 @@ from omr_engine.template import (
 
 
 def all_bubble_centers(template: dict) -> list[tuple[float, float]]:
-    """Semua pusat lingkaran yang harus diarsir/dideteksi mesin."""
+    """Semua pusat lingkaran yang harus diarsir/dideteksi mesin.
+
+    Zona esai tidak punya lingkaran lagi — skornya dinilai guru di aplikasi.
+    """
     centers: list[tuple[float, float]] = []
     for slot in template["multipleChoiceSlots"]:
         for opt in slot["options"]:
             centers.append((opt["xMm"], opt["yMm"]))
-    for slot in template["essaySlots"]:
-        for value in slot["valueOptions"]:
-            centers.append((value["xMm"], value["yMm"]))
     return centers
 
 
@@ -134,26 +134,24 @@ def test_fiducial_di_sudut_zona_aktif() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_zona_esai_punya_dua_sub_bagian_terpisah() -> None:
+def test_zona_esai_hanya_punya_area_jawaban_siswa() -> None:
+    """Zona esai = satu area kosong lebar; skor dinilai guru di aplikasi."""
     template = build_template(pg_count=25, essay_count=5)
     for slot in template["essaySlots"]:
         rect = slot["studentAnswerRectMm"]
-        assert rect["w"] > 0 and rect["h"] > 0
-        assert len(slot["valueOptions"]) == 6
-        assert {v["value"] for v in slot["valueOptions"]} == {0, 1, 2, 3, 4, 5}
-        assert slot["halfModifierOffset"]["xMm"] > 0
-        # area jawaban siswa tidak boleh menimpa lingkaran skor
-        answer_right = rect["x"] + rect["w"]
-        first_circle = min(v["xMm"] for v in slot["valueOptions"])
-        assert answer_right < first_circle
+        assert set(slot.keys()) == {"questionNumber", "xMm", "yMm", "studentAnswerRectMm"}
+        assert rect["w"] >= 150
+        assert rect["h"] >= 14
 
 
-def test_lingkaran_skor_terpisah_jauh_dari_area_jawaban() -> None:
+def test_area_jawaban_esai_berdampingan_tidak_tumpang_tindih() -> None:
+    """Kotak esai tidak boleh menabrak kotak di bawahnya."""
     template = build_template(pg_count=25, essay_count=5)
-    for slot in template["essaySlots"]:
-        rect = slot["studentAnswerRectMm"]
-        circle_xs = [v["xMm"] for v in slot["valueOptions"]]
-        assert min(circle_xs) - (rect["x"] + rect["w"]) >= BUBBLE_DIAMETER_MM
+    slots = template["essaySlots"]
+    for a, b in zip(slots, slots[1:]):
+        ra = a["studentAnswerRectMm"]
+        rb = b["studentAnswerRectMm"]
+        assert rb["y"] >= ra["y"] + ra["h"], "kotak jawaban esai saling tumpang tindih"
 
 
 # --------------------------------------------------------------------------- #

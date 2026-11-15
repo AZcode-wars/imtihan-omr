@@ -249,23 +249,41 @@ State: default · hover (border `brand/700`) · active (`scale-0.95`) · selecte
 
 ---
 
-## 16. ScoreStepper (Skor Esai)
+## 16. EssayMarkRow (Penilaian Esai oleh Guru)
 
-Baris per nomor esai. `bg slate/50`, border 1px `slate/200/80`, `radius/md`, `px-10`, `py-8`.
+> Menggantikan `ScoreStepper` yang lama (tombol ± untuk nilai 0–5 dengan modifier
+> `[+.5]`). Subsection: skor esai **tidak lagi dibaca dari kertas** — guru
+> menilai sendiri, jadi komponen ini adalah input, bukan stepper angka.
+
+Satu baris per nomor esai. `bg slate/50`, border 1px `slate/200/80`, `radius/md`, `px-10`, `py-8`.
 
 ```
-┌───────────────────────────────┐
-│ E1      [ − ]   3,5   [ + ]   │
-└───────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│ ┌──────────┐  E1  [ ✓ Benar ] [ ✗ Salah ]         │
+│ │ crop     │      nilai: [ 5 ]                    │
+│ │ tulisan  │                                       │
+│ └──────────┘                                       │
+└──────────────────────────────────────────────────┘
 ```
 
 | Bagian | Spesifikasi |
 |---|---|
-| Label | `body` 13/18 800 `slate/600` — "E1" |
-| Tombol ± | **44 × 44**, `radius/sm`, `bg white`, border 1px `slate/200`, `h3` 700 `slate/700` |
-| Nilai | lebar 40px, `scoreSm` 15/20 700, `tabular-nums`, `brand/800`, rata tengah |
+| Crop tulisan tangan | Rasio 16:9, lebar 96px, `radius/sm`, border 1px `slate/200`, `bg white`. Sumber: `essayCrops` dari engine |
+| Label | `bodyStrong` 13/18 700 `slate/600` — "E1" (nomor esai terpisah dari PG) |
+| Tombol **Benar** | **44 × 44**, `radius/sm`, `bg brand/700` + teks putih saat aktif, `bg white` + border `slate/200` saat tidak |
+| Tombol **Salah** | **44 × 44**, `radius/sm`, `bg white` + border `slate/200` + teks `slate/700` saat aktif |
+| Kolom skor parsial | Input angka, lebar 64px, `h-11`, `radius/sm`, border 2px `brand/700`, `scoreSm` + `tabular-nums`, `brand/800` |
+| Tanda sudah dinilai | Ikon `Check` 16px `brand/600` di kiri baris |
 
-Batas nilai 0.0 – 5.0, langkah 0.5.
+**Perilaku penting (FR-5.4):**
+
+| Aksi guru | Efek |
+|---|---|
+| Memilih **Benar** | Kolom skor parsial **otomatis** terisi `maxScore` (poin penuh) |
+| Memilih **Salah** | Kolom skor parsial **otomatis** terisi `0` |
+| Mengubah angka di kolom | Status soal menjadi `PARTIAL`; angka dibatasi 0…`maxScore`, kelipatan 0,5 |
+
+Logikanya ada di `apps/web/src/lib/scoring.ts` → `essayPartialForOutcome()` dan `essayPointsFor()`.
 
 ---
 

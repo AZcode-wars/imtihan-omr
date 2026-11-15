@@ -77,20 +77,13 @@ INSTRUCTIONS = (
 
 MC_START_Y_MM = 52.0
 
-ESSAY_START_PREFERRED_MM = 164.0
 ESSAY_LABEL_X_MM = 14.0
-ESSAY_LABEL_W_MM = 8.0
-ESSAY_ANSWER_X_MM = 24.0
-ESSAY_ANSWER_W_MM = 96.0
-ESSAY_ANSWER_H_MM = 16.0
+ESSAY_LABEL_W_MM = 12.0
+ESSAY_ANSWER_X_MM = 26.0
+#: Kotak jawaban esai memakai lebar penuh area konten (26 → 190 mm).
+ESSAY_ANSWER_W_MM = 164.0
+ESSAY_ANSWER_H_MAX_MM = 24.0
 ESSAY_ANSWER_H_MIN_MM = 14.0
-ESSAY_SCORE_X_MM = 132.0
-ESSAY_HALF_X_MM = 182.0
-ESSAY_HALF_W_MM = 7.0
-ESSAY_HALF_H_MM = 6.0
-ESSAY_VALUES = (0, 1, 2, 3, 4, 5)
-ESSAY_PITCH_MM = 22.0
-ESSAY_PITCH_MIN_MM = 14.0
 ESSAY_GAP_MM = 8.0
 #: Jarak minimum antara dua blok esai, di luar tinggi kotak jawaban.
 ESSAY_BLOCK_GAP_MM = 4.0
@@ -162,22 +155,21 @@ def compute_layout(pg_count: int, essay_count: int) -> Layout:
             raise TemplateOverflowError(_overflow_message(pg_count, essay_count, 0))
         return layout
 
-    # Blok esai dikompresi bertahap sampai muat: jarak antar blok dulu,
-    # baru tinggi kotak jawaban. Jarak antar blok WAJIB >= tinggi kotak + 4 mm,
-    # kalau tidak kotak jawaban antar nomor akan saling tumpang tindih.
-    # Zona esai menempel di bawah zona PG + celah — bukan di posisi tetap —
-    # supaya ruang kosong tidak terbuang.
-    for answer_h in (ESSAY_ANSWER_H_MM, ESSAY_ANSWER_H_MIN_MM):
-        min_pitch = answer_h + ESSAY_BLOCK_GAP_MM
-        for pitch in (ESSAY_PITCH_MM, 20.0, 18.0, 16.0, ESSAY_PITCH_MIN_MM):
-            if pitch < min_pitch:
-                continue
-            start = mc_last_center_y + ESSAY_GAP_MM
-            bottom = start + (essay_count - 1) * pitch + answer_h
-            if bottom <= CONTENT_BOTTOM_MM:
-                return Layout(
-                    pg_count, essay_count, rows, mc_last_center_y, start, pitch, answer_h
-                )
+    # Zona esai memakai lebar penuh dan tinggi dibagi rata ke seluruh soal.
+    # Tidak ada lingkaran skor di kertas — skor esai dinilai guru di aplikasi.
+    start = mc_last_center_y + ESSAY_GAP_MM
+    available = CONTENT_BOTTOM_MM - start
+    for answer_h in (
+        ESSAY_ANSWER_H_MAX_MM,
+        22.0,
+        20.0,
+        18.0,
+        16.0,
+        ESSAY_ANSWER_H_MIN_MM,
+    ):
+        pitch = answer_h + ESSAY_BLOCK_GAP_MM
+        if (essay_count - 1) * pitch + answer_h <= available:
+            return Layout(pg_count, essay_count, rows, mc_last_center_y, start, pitch, answer_h)
 
     raise TemplateOverflowError(_overflow_message(pg_count, essay_count, rows))
 
@@ -272,31 +264,18 @@ def build_template(
     essay_slots = []
     for number in range(1, essay_count + 1):
         top = layout.essay_start_y + (number - 1) * layout.essay_pitch
-        answer_y = top + (layout.essay_answer_h - ESSAY_ANSWER_H_MM) / 2
         essay_slots.append(
             {
                 "questionNumber": number,
                 "xMm": ESSAY_LABEL_X_MM,
-                "yMm": top,
-                # Sub-bagian 1 — area kosong untuk tulisan siswa (TIDAK dibaca mesin)
+                "yMm": round(top, 3),
+                # Area kosong untuk tulisan siswa. Mesin hanya memotong (crop)
+                # area ini; skor esai dinilai guru di aplikasi.
                 "studentAnswerRectMm": {
                     "x": ESSAY_ANSWER_X_MM,
-                    "y": round(answer_y, 3),
+                    "y": round(top, 3),
                     "w": ESSAY_ANSWER_W_MM,
                     "h": layout.essay_answer_h,
-                },
-                # Sub-bagian 2 — lingkaran skor guru (dibaca mesin)
-                "valueOptions": [
-                    {
-                        "value": value,
-                        "xMm": ESSAY_SCORE_X_MM + value * BUBBLE_PITCH_MM,
-                        "yMm": round(top + layout.essay_answer_h / 2, 3),
-                    }
-                    for value in ESSAY_VALUES
-                ],
-                "halfModifierOffset": {
-                    "xMm": ESSAY_HALF_X_MM,
-                    "yMm": round(top + layout.essay_answer_h / 2, 3),
                 },
             }
         )

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   applyRounding,
   calculateFinalGrade,
+  essayPartialForOutcome,
+  essayPointsFor,
   formatFinalScore,
   isPassing,
   roundTo,
-  type EssayQuestionResult,
+  type EssayMarkResult,
   type McQuestionResult,
 } from "./scoring";
 
@@ -32,20 +34,21 @@ function mcSeries(total: number, correctCount: number, overrides: Partial<McQues
   );
 }
 
-function essay(number: number, overrides: Partial<EssayQuestionResult> = {}): EssayQuestionResult {
-  return { number, maxScore: 5, baseScore: 0, hasHalfModifier: false, ...overrides };
+function essay(number: number, overrides: Partial<EssayMarkResult> = {}): EssayMarkResult {
+  return { number, maxScore: 5, outcome: "CORRECT", ...overrides };
 }
 
-/** Skor esai eksplisit. Contoh: [4,3,4,3,4] + modifier pada soal ke-2 = 18,5. */
-function essayFrom(baseScores: number[], modifiers: number[] = []) {
-  return baseScores.map((base, i) =>
-    essay(i + 1, { baseScore: base, hasHalfModifier: modifiers.includes(i + 1) }),
-  );
-}
-
-/** Skenario baku: 5 soal esai, total 18,5 dari maksimum 25. */
-const ESSAY_SCORES = [4, 3, 4, 3, 4];
-const ESSAY_MODIFIER_ON = [2];
+/**
+ * Skenario baku: 5 soal esai, total 16 dari maksimum 25.
+ * 5 (benar) + 3,5 (parsial) + 0 (salah) + 5 (benar) + 2,5 (parsial) = 16
+ */
+const ESSAY_MARKS: EssayMarkResult[] = [
+  { number: 1, maxScore: 5, outcome: "CORRECT" },
+  { number: 2, maxScore: 5, outcome: "PARTIAL", partialScore: 3.5 },
+  { number: 3, maxScore: 5, outcome: "INCORRECT" },
+  { number: 4, maxScore: 5, outcome: "CORRECT" },
+  { number: 5, maxScore: 5, outcome: "PARTIAL", partialScore: 2.5 },
+];
 
 /* ------------------------------------------------------------------ *
  * Pembulatan
@@ -89,6 +92,52 @@ describe("applyRounding", () => {
 });
 
 /* ------------------------------------------------------------------ *
+ * Skor esai — dinilai guru di aplikasi
+ * ------------------------------------------------------------------ */
+
+describe("essayPointsFor", () => {
+  it("CORRECT memberi poin penuh", () => {
+    expect(essayPointsFor({ number: 1, maxScore: 5, outcome: "CORRECT" })).toBe(5);
+  });
+
+  it("INCORRECT memberi 0", () => {
+    expect(essayPointsFor({ number: 1, maxScore: 5, outcome: "INCORRECT" })).toBe(0);
+  });
+
+  it("PARTIAL memakai nilai yang diinput guru", () => {
+    expect(
+      essayPointsFor({ number: 1, maxScore: 5, outcome: "PARTIAL", partialScore: 3.5 }),
+    ).toBe(3.5);
+  });
+
+  it("PARTIAL di atas maxScore dijepit ke maxScore", () => {
+    expect(
+      essayPointsFor({ number: 1, maxScore: 5, outcome: "PARTIAL", partialScore: 9 }),
+    ).toBe(5);
+  });
+
+  it("PARTIAL negatif dijepit ke 0", () => {
+    expect(
+      essayPointsFor({ number: 1, maxScore: 5, outcome: "PARTIAL", partialScore: -2 }),
+    ).toBe(0);
+  });
+
+  it("PARTIAL tanpa nilai dianggap 0", () => {
+    expect(essayPointsFor({ number: 1, maxScore: 5, outcome: "PARTIAL" })).toBe(0);
+  });
+});
+
+describe("essayPartialForOutcome", () => {
+  it("memilih Benar mengisi kolom dengan poin penuh", () => {
+    expect(essayPartialForOutcome(5, "CORRECT")).toBe(5);
+  });
+
+  it("memilih Salah mengisi kolom dengan 0", () => {
+    expect(essayPartialForOutcome(5, "INCORRECT")).toBe(0);
+  });
+});
+
+/* ------------------------------------------------------------------ *
  * Mode A — Persentase Bagian
  * ------------------------------------------------------------------ */
 
@@ -97,7 +146,7 @@ describe("calculateFinalGrade — Mode A (persentase)", () => {
     mode: "MODE_A_PERCENTAGE" as const,
     rounding: "EXACT_2_DECIMAL" as const,
     mcQuestions: mcSeries(25, 22),
-    essayQuestions: essayFrom(ESSAY_SCORES, ESSAY_MODIFIER_ON),
+    essayQuestions: ESSAY_MARKS,
     weights: { multipleChoicePercent: 60, essayPercent: 40 },
   };
 
@@ -105,10 +154,10 @@ describe("calculateFinalGrade — Mode A (persentase)", () => {
     const r = calculateFinalGrade(base);
     expect(r.mcPoints).toBe(22);
     expect(r.mcMaxPoints).toBe(25);
-    expect(r.essayPoints).toBe(18.5);
+    expect(r.essayPoints).toBe(16);
     expect(r.essayMaxPoints).toBe(25);
-    expect(r.rawScore).toBeCloseTo((22 / 25) * 60 + (18.5 / 25) * 40, 10);
-    expect(r.finalGrade).toBeCloseTo(82.4, 10);
+    expect(r.rawScore).toBeCloseTo((22 / 25) * 60 + (16 / 25) * 40, 10);
+    expect(r.finalGrade).toBeCloseTo(78.4, 10);
     expect(r.scale).toBe("0-100");
     expect(r.totalPossiblePoints).toBe(100);
   });
@@ -126,7 +175,7 @@ describe("calculateFinalGrade — Mode A (persentase)", () => {
       ...base,
       weights: { multipleChoicePercent: 0, essayPercent: 100 },
     });
-    expect(r.finalGrade).toBeCloseTo((18.5 / 25) * 100, 10);
+    expect(r.finalGrade).toBeCloseTo((16 / 25) * 100, 10);
   });
 
   it("bobot yang tidak berjumlah 100 dinormalisasi, nilai tetap 0-100", () => {
@@ -134,9 +183,8 @@ describe("calculateFinalGrade — Mode A (persentase)", () => {
       ...base,
       weights: { multipleChoicePercent: 70, essayPercent: 50 },
     });
-    // (22/25)*(70/120)*100 + (18.5/25)*(50/120)*100
-    expect(r.rawScore).toBeCloseTo(82.1666666, 6);
-    expect(r.finalGrade).toBe(82.17);
+    expect(r.rawScore).toBeCloseTo(78, 10);
+    expect(r.finalGrade).toBe(78);
     expect(r.finalGrade).toBeGreaterThanOrEqual(0);
     expect(r.finalGrade).toBeLessThanOrEqual(100);
   });
@@ -144,13 +192,13 @@ describe("calculateFinalGrade — Mode A (persentase)", () => {
   it("bobot default 60/40 dipakai bila tidak diisi", () => {
     const { weights: _ignored, ...withoutWeights } = base;
     const r = calculateFinalGrade(withoutWeights);
-    expect(r.finalGrade).toBeCloseTo((22 / 25) * 60 + (18.5 / 25) * 40, 10);
+    expect(r.finalGrade).toBeCloseTo((22 / 25) * 60 + (16 / 25) * 40, 10);
   });
 
   it("tidak ada soal PG -> hanya esai yang dihitung, tanpa NaN", () => {
     const r = calculateFinalGrade({ ...base, mcQuestions: [] });
     expect(Number.isNaN(r.finalGrade)).toBe(false);
-    expect(r.finalGrade).toBeCloseTo((18.5 / 25) * 40, 10);
+    expect(r.finalGrade).toBeCloseTo((16 / 25) * 40, 10);
   });
 
   it("tidak ada soal esai -> hanya PG yang dihitung, tanpa NaN", () => {
@@ -176,13 +224,13 @@ describe("calculateFinalGrade — Mode B (poin langsung)", () => {
       mode: "MODE_B_DIRECT_POINTS",
       rounding: "EXACT_2_DECIMAL",
       mcQuestions: mcSeries(25, 22, { pointsCorrect: 2 }),
-      essayQuestions: essayFrom(ESSAY_SCORES, ESSAY_MODIFIER_ON),
+      essayQuestions: ESSAY_MARKS,
     });
     expect(r.mcPoints).toBe(44);
     expect(r.mcMaxPoints).toBe(50);
-    expect(r.essayPoints).toBe(18.5);
-    expect(r.rawScore).toBe(62.5);
-    expect(r.finalGrade).toBe(62.5);
+    expect(r.essayPoints).toBe(16);
+    expect(r.rawScore).toBe(60);
+    expect(r.finalGrade).toBe(60);
     expect(r.scale).toBe("points");
     expect(r.totalPossiblePoints).toBe(75);
   });
@@ -192,14 +240,14 @@ describe("calculateFinalGrade — Mode B (poin langsung)", () => {
       mode: "MODE_B_DIRECT_POINTS",
       rounding: "EXACT_2_DECIMAL",
       mcQuestions: mcSeries(25, 22, { pointsCorrect: 2 }),
-      essayQuestions: essayFrom(ESSAY_SCORES, ESSAY_MODIFIER_ON),
+      essayQuestions: ESSAY_MARKS,
       weights: { multipleChoicePercent: 90, essayPercent: 10 },
     });
     const withoutWeights = calculateFinalGrade({
       mode: "MODE_B_DIRECT_POINTS",
       rounding: "EXACT_2_DECIMAL",
       mcQuestions: mcSeries(25, 22, { pointsCorrect: 2 }),
-      essayQuestions: essayFrom(ESSAY_SCORES, ESSAY_MODIFIER_ON),
+      essayQuestions: ESSAY_MARKS,
     });
     expect(withWeights.finalGrade).toBe(withoutWeights.finalGrade);
   });
@@ -291,43 +339,6 @@ describe("status nomor PG", () => {
 });
 
 /* ------------------------------------------------------------------ *
- * Skor esai
- * ------------------------------------------------------------------ */
-
-describe("skor esai", () => {
-  it("modifier +0,5 menambah setengah poin", () => {
-    const r = calculateFinalGrade({
-      mode: "MODE_B_DIRECT_POINTS",
-      rounding: "EXACT_2_DECIMAL",
-      mcQuestions: [],
-      essayQuestions: [essay(1, { baseScore: 3, hasHalfModifier: true })],
-    });
-    expect(r.essayPoints).toBe(3.5);
-    expect(r.essayMaxPoints).toBe(5);
-  });
-
-  it("skor dibatasi oleh maxScore", () => {
-    const r = calculateFinalGrade({
-      mode: "MODE_B_DIRECT_POINTS",
-      rounding: "EXACT_2_DECIMAL",
-      mcQuestions: [],
-      essayQuestions: [essay(1, { baseScore: 5, maxScore: 4, hasHalfModifier: true })],
-    });
-    expect(r.essayPoints).toBe(4);
-  });
-
-  it("skor negatif dibatasi 0", () => {
-    const r = calculateFinalGrade({
-      mode: "MODE_B_DIRECT_POINTS",
-      rounding: "EXACT_2_DECIMAL",
-      mcQuestions: [],
-      essayQuestions: [essay(1, { baseScore: -2 })],
-    });
-    expect(r.essayPoints).toBe(0);
-  });
-});
-
-/* ------------------------------------------------------------------ *
  * Kelulusan & format tampilan
  * ------------------------------------------------------------------ */
 
@@ -351,10 +362,10 @@ describe("formatFinalScore", () => {
       mode: "MODE_A_PERCENTAGE",
       rounding: "EXACT_2_DECIMAL",
       mcQuestions: mcSeries(25, 22),
-      essayQuestions: essayFrom(ESSAY_SCORES, ESSAY_MODIFIER_ON),
+      essayQuestions: ESSAY_MARKS,
       weights: { multipleChoicePercent: 60, essayPercent: 40 },
     });
-    expect(formatFinalScore(r)).toBe("82,4");
+    expect(formatFinalScore(r)).toBe("78,4");
   });
 
   it("Mode B menampilkan poin mentah dengan penyebut", () => {
@@ -362,8 +373,8 @@ describe("formatFinalScore", () => {
       mode: "MODE_B_DIRECT_POINTS",
       rounding: "EXACT_2_DECIMAL",
       mcQuestions: mcSeries(25, 22, { pointsCorrect: 2 }),
-      essayQuestions: essayFrom(ESSAY_SCORES, ESSAY_MODIFIER_ON),
+      essayQuestions: ESSAY_MARKS,
     });
-    expect(formatFinalScore(r)).toBe("62,5 / 75 poin");
+    expect(formatFinalScore(r)).toBe("60 / 75 poin");
   });
 });

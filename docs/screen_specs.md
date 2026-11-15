@@ -220,7 +220,7 @@ Latar `slate/950`. Tidak ada garis laser bergerak (keputusan "kalem"). Tombol se
 │        │ │▣ 04 Dimas P.   ✓  │ │ Nama: [Ahmad Fauzi     ▾]  │
 │        │ └───────────────────┘ │ ┌──────────────────────────┐ │
 │        │ Memproses 12/30 ▓▓▓░ │ │ ⚠ 7  [A][B][C][D][Kosong]│ │
-│        │                       │ │ E1 3,5 [−][+]            │ │
+│        │                       │ │ E1 ✓Benar  [5]  ✗Salah    │ │
 └────────┴───────────────────────┴──────────────────────────────┘
 ```
 
@@ -283,10 +283,11 @@ Latar `slate/950`. Tidak ada garis laser bergerak (keputusan "kalem"). Tombol se
 │ │ [ A ][ B ][ C ][ D ][ Kosong ]   │ │
 │ └──────────────────────────────────┘ │
 ├──────────────────────────────────────┤
-│ Skor Esai Terbaca (0–5 & +.5)         │
-│ ┌────────────┐ ┌────────────┐       │
-│ │ E1  [−]3,5[+]│ │ E2  [−]4,0[+]│     │
-│ └────────────┘ └────────────┘       │
+│ Skor Esai — diisi guru               │
+│ ┌──────────┐┌──────────────────────┐  │
+│ │crop tulis││ E1 [✓Benar] [✗Salah] │  │
+│ │ tangan   ││    nilai: [5]         │  │
+│ └──────────┘└──────────────────────┘  │
 ├──────────────────────────────────────┤
 │ [ Simpan & Scan Berikutnya      → ]  │ ← sticky
 └──────────────────────────────────────┘
@@ -321,8 +322,24 @@ Hanya nomor berstatus `EMPTY`, `MULTIPLE`, atau `LOW_CONFIDENCE` yang tampil (FR
 - Chip list: `flex flex-wrap gap-8`, chip §13/§14.
 - Chip yang sudah dikoreksi berubah jadi `VALID` dan tetap terlihat (agar guru tahu itu sudah beres).
 
-### Zona 4 — Skor Esai
-`grid-cols-2 gap-8`. Tiap baris ScoreStepper §16. Jika `essayCount = 0`, tampilkan teks "Tidak ada soal esai pada ujian ini." (`label` 12/16, `slate/400`, italic).
+### Zona 4 — Penilaian Esai (diisi guru)
+
+`grid-cols-2 gap-8`. Tiap baris adalah satu nomor esai, terdiri dari:
+
+| Bagian | Spec |
+|---|---|
+| Crop tulisan tangan | Potongan gambar area jawaban esai (dari `essayCrops`), rasio 16:9, `rounded-md`, border 1px `slate/200` |
+| Label | `E1`, `E2`, … (nomor esai **terpisah** dari nomor PG), `bodyStrong` 13/18 700 `slate/600` |
+| Tombol **Benar** | Toggle. Memilihnya mengisi otomatis kolom skor parsial dengan poin penuh (`maxScore`) |
+| Tombol **Salah** | Toggle. Memilihnya mengisi otomatis kolom skor parsial dengan `0` |
+| Kolom skor parsial | Input angka 0…`maxScore`, kelipatan 0,5. Diubah manual → status menjadi `PARTIAL` |
+| Poin | `scoreSm` tabular, `brand/800` |
+
+Aktif: tombol **Benar** → `bg-brand-700 text-white`; tombol **Salah** → `bg-white border-slate-200`. Kolom skor parsial `w-16` dengan `border-2 border-brand-700`.
+
+Baris yang sudah dinilai diberi tanda centang hijau `brand/600` di kiri.
+
+Jika `essayCount = 0`, tampilkan teks "Tidak ada soal esai pada ujian ini." (`label` 12/16, `slate/400`, italic).
 
 ### CTA
 Sticky di footer sheet: "Simpan & Scan Berikutnya" (`primary` `lg`, penuh) dengan ikon `arrow-right`.
@@ -423,9 +440,10 @@ Tombol mengunduh CSV dengan kolom: `NIS, Nama, Skor PG, Skor Esai, Nilai Akhir, 
 │      │ I. PILIHAN GANDA (25)      │  │
 │      │ 01 (A)(B)(C)(D)  14 (A)(B)(C)(D)│
 │      │ 02 (A)(B)(C)(D)  15 ...    │  │
-│      │ II. ZONA SKOR ESAI — ...   │  │
-│      │ E1 (0)(1)(2)(3)(4)(5)[+.5] │  │
-│      │                  ■      ■  │  │
+│      │ II. ZONA JAWABAN ESAI      │  │
+│      │ E1 ┌──────────────────────┐│  │
+│      │ E2 │                      ││  │
+│      │ E3 └──────────────────────┘│  │
 │      └───────────────────────────┘  │
 ├──────────────────────────────────────┤
 │ 25 PG · 5 Esai · A4 · 2 kolom        │
@@ -437,61 +455,70 @@ Tombol mengunduh CSV dengan kolom: `NIS, Nama, Skor PG, Skor Esai, Nilai Akhir, 
 | Elemen | Ukuran | Posisi |
 |---|---|---|
 | Kertas | A4 = 210 × 297 mm | Rasio preview **1 : 1.414** |
+| Margin fiducial | 8 mm | Sudut zona aktif |
 | Fiducial kiri-atas | **14 × 14 mm** | Sudut zona aktif |
 | Fiducial 3 lainnya | **10 × 10 mm** | Sudut zona aktif |
-| Bubble PG | ⌀ **4,5 mm** | Jarak antar pusat ≥ **8,5 mm** |
-| Tata letak | **2 kolom** | Penomoran berjalan kolom 1 → kolom 2 |
-| Zona nama | Kotak garis putus | Di atas zona aktif |
-| **Zona esai** | **Dua sub-bagian per nomor** | Di bawah zona aktif |
-| Area jawaban siswa | **62 × 16 mm** (≈3 baris) | Di kiri nomor esai |
-| Area skor guru | 6 lingkaran ⌀ 4,5 mm + 1 kotak `[+.5]` | Di kanan area jawaban |
-| Margin cetak | 10 mm | Overlay opsional |
+| Bubble PG | ⌀ **4,5 mm** | Jarak antar pusat ≥ **6 mm** |
+| Jarak nomor → bubble pertama | 9 mm | Kolom PG |
+| Posisi kolom PG | kolom 1 x = 14 mm, kolom 2 x = 62 mm | Penomoran kolom 1 → kolom 2 |
+| Tata letak | **2 kolom** | |
+| Judul utama | x = 25 mm | Di kanan fiducial kiri-atas |
+| Zona nama | Kotak garis putus, 90 × 12 mm | Di atas zona aktif |
+| Kotak petunjuk | 90 × 40 mm | Di kanan zona PG |
+| **Zona esai** | **Satu area per nomor, tanpa lingkaran skor** | Di bawah zona PG |
+| Area jawaban siswa | **164 mm × tinggi dibagi rata** (min. 14 mm) | Sepanjang area konten |
+
+> **Perubahan v1.1:** zona esai tidak lagi memuat lingkaran skor `0–5` + `[+.5]`.
+> Area jawaban sekarang selebar penuh (164 mm) dan tingginya dibagi rata ke seluruh
+> nomor esai. Nomor esai terpisah dari nomor PG (`E1`…`EM`). Skor dinilai guru
+> di aplikasi — lihat Zone 4 di bawah.
 
 ### Kapasitas satu halaman A4
 
-Dibatasi jarak antar pusat antar bubble **8,5 mm** (PRD FR-1.2) — bukan pilihan desain. Angka di bawah hasil implementasi (`packages/omr-engine`, `compute_layout`):
+Dibatasi jarak antar pusat antar bubble **6 mm** (PRD FR-1.2) — bukan pilihan desain. Angka di bawah hasil implementasi (`packages/omr-engine`, `compute_layout`):
 
 | Soal esai | PG maksimum |
 |---|---|
 | 0 | 50 |
-| 1 | 48 |
-| 2 | 44 |
-| 3 | 40 |
-| 4 | 34 |
-| 5 | 30 |
-| 6 | 26 |
-| 7 | 22 |
-| 8 | 18 |
-| 9 | 14 |
-| 10 | 10 |
+| 1 | 50 |
+| 2 | 50 |
+| 3 | 50 |
+| 4 | 50 |
+| 5 | 44 |
+| 6 | 38 |
+| 7 | 32 |
+| 8 | 26 |
+| 9 | 20 |
+| 10 | 14 |
 
 Kombinasi yang melebihi batas **ditolak sistem** dengan pesan yang bisa ditindaklanjuti guru. Layar `/setup` **wajib** menampilkan batas ini secara langsung dari `max_essay_count_for(pgCount)` — bukan hanya lewat pesan error saat menekan tombol cetak.
 
-### Bentuk blok esai (sub-bagian ganda)
+### Bentuk blok esai (satu area per nomor)
 
-Setiap nomor esai punya **dua area dengan koordinat terpisah**, supaya OMR membaca lingkaran skor tanpa mengotori tulisan tangan siswa:
+Setiap nomor esai punya **satu area kosong selebar penuh** untuk tulisan tangan siswa. Tidak ada lagi lingkaran skor di kertas:
 
 ```
-┌── ZONA ESAI ─────────────────────────────────────────────┐
-│ E1  ┌────────────────────────┐    NILAI                 │
-│     │                        │   (0)(1)(2)(3)(4)(5)     │
-│     │   tulisan tangan      │        [ +.5 ]           │
-│     │   siswa               │                           │
-│     └────────────────────────┘                           │
-│ E2  ┌────────────────────────┐    NILAI                 │
-│     │   tulisan tangan      │   (0)(1)(2)(3)(4)(5)     │
-│     │   siswa               │        [ +.5 ]           │
-│     └────────────────────────┘                           │
-└──────────────────────────────────────────────────────────┘
+┌── ZONA JAWABAN ESAI ───────────────────────────────────────┐
+│ E1  ┌────────────────────────────────────────────────────┐   │
+│     │                                                    │   │
+│     │              tulisan tangan siswa                  │   │
+│     │                                                    │   │
+│     └────────────────────────────────────────────────────┘   │
+│ E2  ┌────────────────────────────────────────────────────┐   │
+│     │              tulisan tangan siswa                  │   │
+│     └────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 | Metadata | Isi | Dibaca mesin? |
 |---|---|---|
-| `studentAnswerRectMm` | Area jawaban siswa | Tidak — hanya ditampilkan sebagai crop saat verifikasi |
-| `valueOptions` | 6 lingkaran nilai 0–5 | Ya — rasio piksel terisi |
-| `halfModifierOffset` | Kotak `[+.5]` | Ya — menentukan nilai separuh (2,5 bukan 2 atau 3) |
+| `studentAnswerRectMm` | Area jawaban siswa | Tidak — hanya di-*crop* lalu ditampilkan ke guru saat menilai |
 
-> **Alur guru (FR-5.4):** guru membaca esai → **melingkari** angka pada kertas → LJK selesai → dipindai → skor esai terbaca otomatis dan tampil di Zone 4 sheet verifikasi, dengan tombol `±0,5` untuk koreksi cepat bila perlu.
+Tinggi area dibagi rata ke seluruh nomor esai (minimal 14 mm agar muat ≥2 baris tulisan tangan), dengan jarak antar blok 4 mm.
+
+> **Kenapa begitu:** dengan skor esai dinilai guru di aplikasi, tidak perlu ada ruang di kertas untuk lingkaran skor. Area jawaban menjadi jauh lebih luas — dan mesin hanya perlu memotong satu area per nomor untuk dibaca guru.
+
+> **Alur guru (FR-5.4):** guru menilai esai → mencatat di kertas (atau ingatnya) → LJK selesai → dipindai → di aplikasi, Zone 4 menampilkan **satu baris per nomor esai** berisi crop tulisan tangan + tombol Benar/Salah + kolom skor parsial → digabung dengan skor PG menjadi nilai akhir.
 
 ### Komponen
 

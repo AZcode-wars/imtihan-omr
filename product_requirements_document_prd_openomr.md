@@ -57,17 +57,16 @@ open-omr/
   * **Catatan (revisi v1.1):** jarak minimal turun dari `8,5 mm` menjadi `6 mm` — celah antar sisi bubble 1,5 mm, jauh lebih rapat sehingga 25 soal PG hanya membutuhkan 78 mm (bukan 110 mm) dan zona esai mendapat ruang jauh lebih lega. Konsekuensinya keandalan pembacaan pada celah 1,5 mm **wajib diverifikasi dengan pensil sungguhan** (retis & pencahayaan redup) sebelum rilis — lihat Task 4.
 * **FR-1.3:** Setiap LJK wajib memiliki **4 Fiducial Markers** (kotak hitam solid di keempat sudut zona aktif), dengan ukuran kotak kiri-atas (`14x14 mm`) lebih besar dari tiga sudut lainnya (`10x10 mm`) untuk deteksi orientasi otomatis.
 * **FR-1.4:** Bagian atas zona aktif menyediakan kolom isian tulis tangan untuk **Nama Siswa** dan **Kelas**.
-* **FR-1.5:** Bagian bawah zona aktif menyediakan **Zona Esai**, dengan dua sub-bagian per nomor esai:
-  * **Area Jawaban Siswa** — kotak kosong untuk menulis jawaban esai secara tangan, dengan nomor soal (`E1`, `E2`, …) di sampingnya.
-  * **Area Skor Esai (Diisi Guru)** — strip lingkaran angka bulat `(0) (1) (2) (3) (4) (5)` ditambah satu lingkaran modifier `[+.5]` pada setiap nomor esai, untuk mengakomodasi nilai separuh benar (misal `2,5`).
-  * Kedua sub-bagian punya koordinat sendiri pada metadata template, sehingga mesin OMR membaca area skor tanpa mengotori tulisan siswa.
+* **FR-1.5:** Bagian bawah zona aktif menyediakan **Zona Jawaban Esai**: satu area kosong untuk menulis jawaban esai secara tangan pada **setiap** nomor esai (`E1`, `E2`, …), selebar penuh area konten.
+  * **Tidak ada lingkaran skor di kertas.** Skor esai dinilai guru langsung di aplikasi (FR-5.4), lalu digabungkan dengan skor Pilihan Ganda. Konsekuensinya: area jawaban esai jauh lebih luas daripada bila ruangnya dipakai untuk lingkaran skor, dan mesin OMR cukup memotong (crop) area itu supaya guru bisa membaca tulisan tangan.
+  * Nomor esai **terpisah** dari nomor Pilihan Ganda (`E1`…`EM`), dan tinggi area jawaban dibagi rata ke seluruh nomor esai.
 
 ### FR-2: Manajemen Ujian & Konfigurasi Penilaian (*Scoring Rules*)
 * **FR-2.1:** Sistem mendukung jumlah soal dinamis sesuai input guru (ujian *full* PG, *full* Esai, atau campuran).
 * **FR-2.2:** Guru wajib memilih salah satu dari **2 Mode Pembobotan Nilai**:
   * **Mode A (Persentase Bagian):** Guru menentukan bobot persentase PG dan Esai (total = 100%, misal `PG 60% : Esai 40%`). Sistem otomatis menormalisasi skor mentah tiap bagian menjadi skala nilai akhir 0–100.
   * **Mode B (Akumulasi Poin Langsung):** Sistem menjumlahkan langsung poin PG dan poin Esai yang diperoleh siswa berdasarkan bobot poin yang ditetapkan guru per nomor soal. **Nilai akhir Mode B adalah poin mentah** (rentang `0`–`totalPoinMaksimal`), bukan skala 0–100. Konsekuensi UI: nilai ditampilkan sebagai `81 / 100 poin`, dan KKM (§FR-2.5) pada Mode B juga diekspresikan dalam poin.
-* **FR-2.3:** Guru dapat mengatur poin benar, penalti salah (opsional, *default* `0`), serta status khusus per nomor PG (`ACTIVE`, `BONUS`, atau `VOID`/dianulir) tanpa perlu mencetak ulang LJK.
+* **FR-2.3:** Guru dapat mengatur poin benar, penalti salah (opsional, *default* `0`), status khusus per nomor PG (`ACTIVE`, `BONUS`, atau `VOID`/dianulir), serta **poin penuh per nomor esai** (default `5`, boleh berbeda per nomor) — semuanya tanpa perlu mencetak ulang LJK.
 * **FR-2.4:** Guru dapat memilih aturan pembulatan nilai akhir (`EXACT_2_DECIMAL`, `ROUND_HALF_UP`, atau `CEIL_UP`).
 * **FR-2.5 (KKM):** Guru menetapkan **KKM (Kriteria Ketercapaian Minimum)** per ujian, dalam skala yang sama dengan mode pembobotan aktif (persen untuk Mode A, poin untuk Mode B). KKM menjadi acuan status *Lulus* / *Remedial* pada rekapitulasi (§FR-6.1).
 * **FR-2.6 (Roster Kelas):** Setiap ujian terkait dengan satu **kelas** yang memiliki daftar siswa (nama + NIS). Roster dapat diisi manual, diimpor dari CSV (`nama,nis`), dan diekspor kembali. Roster dipakai untuk dropdown pemilihan siswa pada proses verifikasi (§FR-5.1) dan menjadi acuan jumlah lembar yang harus dipindai.
@@ -81,15 +80,15 @@ open-omr/
 ### FR-4: Pemrosesan Citra (*Core OMR Pipeline*)
 * **FR-4.1:** Mendeteksi 4 *fiducial markers*, memverifikasi orientasi kertas (memutar 180° jika terbalik), dan melakukan *4-point perspective transform* ke resolusi kanvas standar (`800 x 1100` piksel).
 * **FR-4.2:** Menerapkan *adaptive Gaussian thresholding* untuk mengeliminasi bayangan tangan dan variasi pencahayaan ruangan.
-* **FR-4.3:** Menghitung rasio piksel terisi di dalam koordinat setiap lingkaran berdasarkan file JSON template, lalu mengklasifikasikan status setiap baris menjadi: `VALID`, `EMPTY` (kosong), `MULTIPLE` (ganda), atau `LOW_CONFIDENCE` (arsiran tipis di ambang batas).
-* **FR-4.4:** Memotong (*crop*) area kotak Nama Siswa dari gambar yang telah diluruskan dan mengirimkannya dalam respons API.
+* **FR-4.3:** Menghitung rasio piksel terisi di dalam koordinat setiap lingkaran berdasarkan file JSON template, lalu mengklasifikasikan status setiap baris menjadi: `VALID`, `EMPTY` (kosong), `MULTIPLE` (ganda), atau `LOW_CONFIDENCE` (arsiran tipis di ambang batas). Berlaku **hanya untuk Pilihan Ganda** — zona esai tidak lagi bertanda di kertas sehingga tidak ada yang dideteksi di sana (FR-1.5).
+* **FR-4.4:** Memotong (*crop*) area kotak Nama Siswa dari gambar yang telah diluruskan, **dan memotong area jawaban tiap nomor esai**, lalu mengirimkannya dalam respons API supaya guru bisa membaca tulisan tangan saat menilai (FR-5.4).
 
 ### FR-5: Layar Verifikasi Cepat (*Human-in-the-Loop UI*)
 * **FR-5.1:** Menampilkan potongan gambar tulisan nama siswa tepat di atas *dropdown* daftar siswa kelas. Daftar siswa secara otomatis menyembunyikan nama yang LJK-nya sudah dipindai pada ujian berjalan. Sumber daftar ini adalah roster kelas (§FR-2.6).
 * **FR-5.2:** Menampilkan peringatan duplikasi (*Overwrite Warning*) jika guru memilih nama siswa yang datanya sudah tersimpan.
 * **FR-5.3:** Menerapkan tampilan *Exception-First*: menyorot hanya nomor PG yang berstatus `EMPTY`, `MULTIPLE`, atau `LOW_CONFIDENCE` agar guru dapat melakukan koreksi manual dalam 1 sentuhan tanpa memeriksa seluruh nomor.
   * **Catatan status:** `EMPTY` (siswa melewatkan / tidak diisi) adalah kondisi netral, **bukan error** — harus tampil berbeda dari `MULTIPLE` (ganda, kondisi error) agar Exception-First tetap informatif. Setiap status wajib ditandai dengan ikon + label teks, tidak hanya dengan warna.
-* **FR-5.4:** Menampilkan rincian skor esai yang terbaca (termasuk akumulasi `+.5`) dengan opsi edit cepat di layar apabila diperlukan penyesuaian manual.
+* **FR-5.4:** Menyediakan area penilaian esai per nomor — **guru yang menilai, bukan mesin**. Untuk setiap nomor esai, aplikasi menampilkan hasil bacaan tulisan tangan siswa (crop area jawaban) beserta pilihan **Benar** / **Salah** dan kolom skor parsial. Memilih *Benar* otomatis mengisi kolom dengan poin penuh, memilih *Salah* mengisinya dengan 0; guru boleh mengubah angka menjadi nilai di tengah (status menjadi `PARTIAL`). Jumlah poin esai yang benar lalu digabungkan dengan skor Pilihan Ganda (§FR-2.2) menjadi nilai akhir.
 
 ### FR-6: Rekapitulasi & Ekspor Data
 * **FR-6.1:** Menampilkan tabel rekap nilai seluruh siswa dalam satu kelas (Skor PG, Skor Esai, Nilai Akhir, dan status kelulusan terhadap KKM §FR-2.5).

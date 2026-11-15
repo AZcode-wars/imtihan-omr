@@ -44,7 +44,8 @@ export interface MultipleChoiceQuestionConfig {
 
 export interface EssayQuestionConfig {
   number: number; // 1 .. M (dinamis, 0 jika ujian full PG)
-  maxScore: number; // Default: 5 (mendukung kelipatan 0.5)
+  /** Poin penuh bila jawaban esai ini dianggap benar. Default: 5. */
+  maxScore: number;
 }
 
 export interface ExamConfig {
@@ -107,24 +108,18 @@ export interface MultipleChoiceSlot {
   options: McOptionSlot[];
 }
 
-export interface EssayValueSlot {
-  value: number;
-  xMm: number;
-  yMm: number;
-}
-
 /**
- * Satu nomor esai. Dua sub-bagian dengan koordinat TERPISAH:
- * - `studentAnswerRectMm` → area kosong untuk tulisan siswa (TIDAK dibaca mesin)
- * - `valueOptions` + `halfModifierOffset` → lingkaran skor yang diisi guru (dibaca mesin)
+ * Satu nomor esai di LJK.
+ *
+ * Hanya ada **satu** sub-bagian: area kosong tempat siswa menulis jawaban.
+ * Skor esai **tidak** ditulis di kertas — guru menilai sendiri di aplikasi,
+ * lalu memasukkan hasilnya per nomor.
  */
 export interface EssaySlot {
   questionNumber: number;
   xMm: number;
   yMm: number;
   studentAnswerRectMm: RectMm;
-  valueOptions: EssayValueSlot[];
-  halfModifierOffset: PointMm;
 }
 
 export interface ExamTemplate {
@@ -153,12 +148,28 @@ export interface DetectedMCAnswer {
   rawCandidates?: OptionLabel[];
 }
 
-export interface DetectedEssayScore {
+/**
+ * Hasil penilaian guru atas satu soal esai.
+ *
+ * Guru menilai di aplikasi (bukan di kertas). Memilih "Benar" otomatis
+ * mengisi kolom skor parsial dengan `maxScore`; memilih "Salah" mengisinya
+ * dengan 0. Nilai di tengah berarti jawaban dinilai sebagian.
+ */
+export type EssayOutcome = "CORRECT" | "INCORRECT" | "PARTIAL";
+
+export interface EssayMark {
   questionNumber: number;
-  baseScore: number; // 0 - 5
-  hasHalfModifier: boolean; // true jika lingkaran [+0.5] terarsir
-  totalScore: number; // baseScore + (hasHalfModifier ? 0.5 : 0)
-  status: BubbleReadStatus;
+  /** Poin penuh untuk soal ini (dari ExamConfig). */
+  maxScore: number;
+  outcome: EssayOutcome;
+  /** Poin yang benar-benar diberikan. CORRECT = maxScore, INCORRECT = 0. */
+  pointsAwarded: number;
+}
+
+/** Potongan gambar area jawaban esai, supaya guru bisa membaca tulisan tangan. */
+export interface EssayAnswerCrop {
+  questionNumber: number;
+  imageDataUrl: string;
 }
 
 export interface OMRScanResponse {
@@ -168,7 +179,8 @@ export interface OMRScanResponse {
   studentNameCropUrl: string; // Potongan gambar tulisan tangan nama siswa
   fullWarpedImageUrl: string; // Gambar LJK utuh hasil 4-point transform
   mcAnswers: DetectedMCAnswer[];
-  essayScores: DetectedEssayScore[];
+  /** Skor esai dinilai guru di aplikasi — mesin hanya memotong areanya. */
+  essayCrops: EssayAnswerCrop[];
 }
 
 export interface GradedStudentRecord {

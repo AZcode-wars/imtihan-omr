@@ -44,10 +44,10 @@ def test_example_parses_into_pydantic_model() -> None:
     assert template.page_height_mm == 297.0
     assert template.column_count == 2
     assert template.bubble_diameter_mm == 4.5
-    assert template.bubble_pitch_mm == 8.5
+    assert template.bubble_pitch_mm == 6.0
     assert len(template.fiducials) == 4
     assert len(template.multiple_choice_slots) == 25
-    assert len(template.essay_slots) == 2
+    assert len(template.essay_slots) == 5
 
 
 def test_pydantic_round_trip_preserves_json() -> None:
@@ -71,15 +71,18 @@ def test_fiducial_topleft_is_largest() -> None:
     assert by_corner["BOTTOM_RIGHT"] == 10.0
 
 
-def test_essay_slot_has_two_separate_regions() -> None:
-    """Zona esai punya area jawaban siswa DAN area skor guru yang terpisah."""
+def test_essay_slot_hanya_punya_area_jawaban_siswa() -> None:
+    """Zona esai = satu area kosong; skor dinilai guru di aplikasi."""
     template = ExamTemplate.model_validate(load_example())
-    slot = template.essay_slots[0]
-    assert slot.student_answer_rect_mm.w > 0
-    assert slot.student_answer_rect_mm.h > 0
-    assert len(slot.value_options) == 6
-    assert {v.value for v in slot.value_options} == {0, 1, 2, 3, 4, 5}
-    assert slot.half_modifier_offset.x_mm > 0
+    for slot in template.essay_slots:
+        assert slot.student_answer_rect_mm.w > 0
+        assert slot.student_answer_rect_mm.h > 0
+        assert set(slot.model_dump(by_alias=True).keys()) == {
+            "questionNumber",
+            "xMm",
+            "yMm",
+            "studentAnswerRectMm",
+        }
 
 
 # --------------------------------------------------------------------------- #
@@ -120,6 +123,14 @@ def test_pydantic_rejects_missing_student_answer_rect() -> None:
     del raw["essaySlots"][0]["studentAnswerRectMm"]
     with pytest.raises(ValidationError):
         ExamTemplate.model_validate(raw)
+
+
+def test_schema_rejects_legacy_essay_score_circles() -> None:
+    """Lingkaran skor esai sudah dihapus — schema harus menolaknya."""
+    raw = load_example()
+    raw["essaySlots"][0]["valueOptions"] = []
+    with pytest.raises(Exception):
+        Draft202012Validator(load_schema()).validate(raw)
 
 
 def test_pydantic_rejects_extra_field() -> None:

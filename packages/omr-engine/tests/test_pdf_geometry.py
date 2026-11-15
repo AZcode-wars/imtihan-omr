@@ -52,10 +52,10 @@ def test_empat_fiducial_tergambar_dengan_ukuran_benar(pdf: tuple[Path, dict]) ->
     """PRD FR-1.3: kiri-atas 14 mm, tiga sudut lain 10 mm."""
     path, template = pdf
     sizes = sorted(round(w / MM_TO_PT, 3) for _, _, w, _ in rects(path))
-    # 4 fiducial + 2 kotak garis putus (nama & kelas) + 5 kotak jawaban esai
+    # 4 fiducial + 2 kotak garis putus (nama & kelas) + 1 kotak petunjuk + 5 kotak jawaban esai
     assert sizes.count(14.0) == 1, "harus ada tepat satu fiducial 14 mm"
     assert sizes.count(10.0) == 3, "harus ada tiga fiducial 10 mm"
-    assert sizes.count(96.0) == 5, "harus ada lima kotak jawaban esai"
+    assert sizes.count(164.0) == 5, "harus ada lima kotak jawaban esai"
 
 
 def test_kotak_jawaban_esai_di_posisi_yang_benar(pdf: tuple[Path, dict]) -> None:
@@ -68,7 +68,7 @@ def test_kotak_jawaban_esai_di_posisi_yang_benar(pdf: tuple[Path, dict]) -> None
         x = rect["x"] * MM_TO_PT
         y = page_h_pt - (rect["y"] + rect["h"]) * MM_TO_PT
         expected.add((round(x, 2), round(y, 2)))
-    drawn = {(round(x, 2), round(y, 2)) for x, y, w, h in rects(path) if approx(w / MM_TO_PT, 96.0, 0.1)}
+    drawn = {(round(x, 2), round(y, 2)) for x, y, w, h in rects(path) if approx(w / MM_TO_PT, 164.0, 0.1)}
     assert expected.issubset(drawn), "kotak jawaban esai di PDF tidak cocok dengan template"
 
 
@@ -89,11 +89,14 @@ def test_fiducial_kiri_atas_di_poin_atas_kiri(pdf: tuple[Path, dict]) -> None:
 
 
 def test_jumlah_lingkaran_sesuai_jumlah_bubble(pdf: tuple[Path, dict]) -> None:
-    """Setiap lingkaran digambar dengan 4 operator bezier."""
+    """Setiap lingkaran digambar dengan 4 operator bezier.
+
+    Zona esai tidak punya lingkaran lagi, jadi yang dihitung hanya bubble PG.
+    """
     path, template = pdf
     data = path.read_bytes()
     curves = len(re.findall(rb"\s[c]\s", data))
-    bubble_count = len(template["multipleChoiceSlots"]) * 4 + len(template["essaySlots"]) * 6
+    bubble_count = len(template["multipleChoiceSlots"]) * 4
     assert curves >= bubble_count * 4, (
         f"hanya {curves} kurva untuk {bubble_count} lingkaran"
     )

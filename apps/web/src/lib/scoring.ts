@@ -1,4 +1,10 @@
-import type { OptionLabel, QuestionStatus, RoundingRule, ScoringMode } from "@openomr/schemas";
+import type {
+  EssayOutcome,
+  OptionLabel,
+  QuestionStatus,
+  RoundingRule,
+  ScoringMode,
+} from "@openomr/schemas";
 
 /**
  * Kalkulasi nilai — pure function, tanpa I/O.
@@ -16,7 +22,14 @@ import type { OptionLabel, QuestionStatus, RoundingRule, ScoringMode } from "@op
  *
  * ## Perilaku per nomor Esai
  *
- * Skor = `min(maxScore, baseScore + (hasHalfModifier ? 0,5 : 0))`, dibatasi 0..maxScore.
+ * Skor esai **dinilai guru di aplikasi**, bukan dibaca dari kertas — zona esai
+ * di LJK hanya berisi area kosong untuk jawaban siswa.
+ *
+ * | `outcome`   | Poin yang diberikan                    |
+ * |-------------|----------------------------------------|
+ * | `CORRECT`   | `maxScore` (poin penuh)                |
+ * | `INCORRECT` | 0                                      |
+ * | `PARTIAL`   | `partialScore`, dibatasi 0..`maxScore` |
  *
  * ## Dua mode
  *
@@ -38,11 +51,14 @@ export interface McQuestionResult {
   status: QuestionStatus;
 }
 
-export interface EssayQuestionResult {
+/** Hasil penilaian guru atas satu soal esai. */
+export interface EssayMarkResult {
   number: number;
+  /** Poin penuh bila jawaban esai ini dianggap benar. */
   maxScore: number;
-  baseScore: number;
-  hasHalfModifier: boolean;
+  outcome: EssayOutcome;
+  /** Hanya dipakai saat `outcome` = `PARTIAL`. */
+  partialScore?: number;
 }
 
 export interface SectionWeights {
@@ -54,7 +70,7 @@ export interface ScoringInput {
   mode: ScoringMode;
   rounding: RoundingRule;
   mcQuestions: McQuestionResult[];
-  essayQuestions: EssayQuestionResult[];
+  essayQuestions: EssayMarkResult[];
   /** Mode A saja. Default 60 / 40. */
   weights?: SectionWeights;
 }
@@ -110,6 +126,46 @@ export function applyRounding(value: number, rule: RoundingRule): number {
 }
 
 /**
+ * Nilai yang diberikan untuk satu soal esai, diturunkan dari `outcome`.
+ *
+ * `CORRECT` → poin penuh, `INCORRECT` → 0, `PARTIAL` → nilai yang diinput guru
+ * (dibatasi 0..maxScore).
+ */
+export function essayPointsFor(mark: EssayMarkResult): number {
+  switch (mark.outcome) {
+    case "CORRECT":
+      return mark.maxScore;
+    case "INCORRECT":
+      return 0;
+    case "PARTIAL": {
+      const raw = mark.partialScore ?? 0;
+      return Math.min(mark.maxScore, Math.max(0, raw));
+    }
+  }
+}
+
+/**
+ * Nilai yang harus terisi di kolom skor parsial saat guru memilih status.
+ *
+ * Aturan: memilih **Benar** otomatis mengisi kolom dengan poin penuh;
+ * memilih **Salah** mengisinya dengan 0. Guru tetap boleh mengubah angkanya
+ * menjadi nilai di tengah — itu yang membuat statusnya jadi `PARTIAL`.
+ */
+export function essayPartialForOutcome(
+  maxScore: number,
+  outcome: EssayOutcome,
+): number {
+  switch (outcome) {
+    case "CORRECT":
+      return maxScore;
+    case "INCORRECT":
+      return 0;
+    case "PARTIAL":
+      return 0;
+  }
+}
+
+/**
  * Menghitung nilai akhir siswa.
  *
  * Fungsi ini murni: input yang sama selalu menghasilkan output yang sama.
@@ -142,8 +198,7 @@ export function calculateFinalGrade(input: ScoringInput): ScoringResult {
 
   for (const q of essayQuestions) {
     essayMaxPoints += q.maxScore;
-    const withModifier = q.baseScore + (q.hasHalfModifier ? 0.5 : 0);
-    essayPoints += Math.min(q.maxScore, Math.max(0, withModifier));
+    essayPoints += essayPointsFor(q);
   }
 
   let rawScore: number;

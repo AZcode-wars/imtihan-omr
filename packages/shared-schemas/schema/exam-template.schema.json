@@ -105,39 +105,14 @@
     "essaySlot": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "questionNumber",
-        "xMm",
-        "yMm",
-        "studentAnswerRectMm",
-        "valueOptions",
-        "halfModifierOffset"
-      ],
+      "required": ["questionNumber", "xMm", "yMm", "studentAnswerRectMm"],
       "properties": {
         "questionNumber": { "type": "integer", "minimum": 1 },
         "xMm": { "type": "number", "minimum": 0 },
         "yMm": { "type": "number", "minimum": 0 },
         "studentAnswerRectMm": {
           "$ref": "#/$defs/rectMm",
-          "description": "Area kosong tempat siswa menulis jawaban esai. TIDAK dibaca mesin."
-        },
-        "valueOptions": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["value", "xMm", "yMm"],
-            "properties": {
-              "value": { "type": "number", "minimum": 0 },
-              "xMm": { "type": "number", "minimum": 0 },
-              "yMm": { "type": "number", "minimum": 0 }
-            }
-          }
-        },
-        "halfModifierOffset": {
-          "$ref": "#/$defs/pointMm",
-          "description": "Kotak [+0.5] di samping lingkaran nilai. Membedakan 2,5 dari 2 atau 3."
+          "description": "Area kosong tempat siswa menulis jawaban esai. Mesin hanya memotong (crop) area ini untuk ditampilkan ke guru; skor esai dinilai guru di aplikasi, bukan dibaca dari kertas."
         }
       }
     }

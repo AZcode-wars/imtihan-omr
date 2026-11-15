@@ -65,17 +65,19 @@ def test_truth_json_tertulis_dan_konsisten(tmp_path: Path) -> None:
     on_disk = json.loads((tmp_path / "truth.json").read_text(encoding="utf-8"))
     assert on_disk == truth
     assert len(truth["mc"]) == 25
+    # Zona esai tidak bertanda di kertas; yang dicatat adalah posisinya.
     assert len(truth["essay"]) == 5
+    assert set(truth["essay"][0].keys()) == {"questionNumber", "answerRectMm"}
 
 
 def test_distribusi_status_ground_truth() -> None:
-    mc, essay = plan_answers(25, 5)
+    mc = plan_answers(25)
     statuses = [m["status"] for m in mc]
     assert statuses.count("EMPTY") == 3  # kelipatan 7 → 7, 14, 21
     assert statuses.count("MULTIPLE") == 2  # kelipatan 11 → 11, 22
     assert statuses.count("LOW_CONFIDENCE") == 1  # kelipatan 13 → 13
     assert statuses.count("VALID") == 19
-    assert len(essay) == 5
+    assert len(mc) == 25
 
 
 def test_goreng_setiap_bubble_terisi_pada_lokasi_template(tmp_path: Path) -> None:
