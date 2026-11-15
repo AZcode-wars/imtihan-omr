@@ -50,6 +50,26 @@ const TYPE = [
   ["score-sm", "text-score-sm", "24/30"],
 ] as const;
 
+/**
+ * Menentukan warna teks di atas sebuah permukaan, mengikuti WCAG AA
+ * (lihat docs/design_tokens.md §11).
+ *
+ * Dipakai untuk label specimen warna. Ini BUKAN bagian dari sistem desain
+ * produk — di UI asli, teks di atas brand/800 selalu putih dan teks di atas
+ * putih selalu slate-900.
+ */
+function luminance(hex: string) {
+  const c = hex.replace("#", "");
+  const v = [0, 2, 4].map((i) => parseInt(c.substr(i, 2), 16) / 255).map((x) =>
+    x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4),
+  );
+  return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+}
+
+function foreground(hex: string) {
+  return luminance(hex) > 0.35 ? "#0F172A" : "#FFFFFF";
+}
+
 function Section({
   title,
   note,
@@ -90,12 +110,10 @@ export default function DesignSystemPreview() {
             <div
               key={name}
               className="h-20 w-[104px] rounded-md border border-slate-200 p-2"
-              style={{ backgroundColor: `var(--${name})` }}
+              style={{ backgroundColor: `var(--${name})`, color: foreground(hex) }}
             >
-              <p className="text-[10px] font-semibold text-slate-900 mix-blend-difference">
-                {name}
-              </p>
-              <p className="mt-6 text-[10px] text-slate-900 mix-blend-difference">{hex}</p>
+              <p className="text-[10px] font-semibold">{name}</p>
+              <p className="mt-6 text-[10px]">{hex}</p>
             </div>
           ))}
         </div>
@@ -110,12 +128,10 @@ export default function DesignSystemPreview() {
             <div
               key={name}
               className="h-16 w-24 rounded-md border border-slate-200 p-2"
-              style={{ backgroundColor: `var(--${name})` }}
+              style={{ backgroundColor: `var(--${name})`, color: foreground(hex) }}
             >
-              <p className="text-[10px] font-semibold text-slate-900 mix-blend-difference">
-                {name}
-              </p>
-              <p className="mt-3 text-[10px] text-slate-900 mix-blend-difference">{hex}</p>
+              <p className="text-[10px] font-semibold">{name}</p>
+              <p className="mt-3 text-[10px]">{hex}</p>
             </div>
           ))}
         </div>

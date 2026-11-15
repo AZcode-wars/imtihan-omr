@@ -118,4 +118,5 @@
 | Task | Selesai | Commit | Catatan |
 |---|---|---|---|
 | 1 — Fondasi repo | ✅ | `02bceca` | Next 16.4.6 / Tailwind v4.3.3 / shadcn radix-nova / Python 3.13.5. 17/17 token identik. Modul Python bernama `omr_engine` (bukan `omr` — nama device cadangan Windows). |
+| 1 — perbaikan kontras | ✅ | `fixup` | Label warna di halaman preview pakai pasangan foreground terhitung (bukan `mix-blend-difference`). Aturan kontras formal + larangan `brand/500` sebagai latar teks ditambahkan ke `docs/design_tokens.md` §11.1–11.2. |
 | | | | |

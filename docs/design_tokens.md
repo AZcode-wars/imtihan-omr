@@ -261,6 +261,56 @@ Lebar sidebar desktop: **240px** (tetap). Konten desktop maksimum: **1200px**.
 7. Pembaca layar: chip status diumumkan sebagai "Nomor 7, kosong" (bukan "amber").
 8. Ikon dekoratif (di dalam tombol berlabel) diberi `aria-hidden="true"`.
 
+### 11.1 Pasangan permukaan ↔ teks (wajib)
+
+Setiap permukaan berwarna punya **satu** pasangan foreground yang sah. Nilai di bawah dihitung dari rasio kontras WCAG, bukan dikira-kira.
+
+| Permukaan | Teks | Rasio |
+|---|---|---|
+| `brand/50` | `slate/900` | 16,5 : 1 |
+| `brand/100` | `slate/900` | 14,8 : 1 |
+| `brand/200` | `slate/900` | 12,2 : 1 |
+| `brand/300` | `slate/900` | 9,2 : 1 |
+| `brand/400` | `slate/900` | 6,6 : 1 |
+| **`brand/500`** | **tidak ada** | **4,44 : 1 / 4,02 : 1 — dua-duanya < 4,5** |
+| `brand/600` | putih | 5,9 : 1 |
+| `brand/700` | putih | 8,0 : 1 |
+| `brand/800` | putih | 11,6 : 1 |
+| `brand/900` | putih | 13,7 : 1 |
+| `slate/50` … `slate/400` | `slate/900` | 6,96 – 17,06 : 1 |
+| `slate/500` | putih | 4,8 : 1 |
+| `slate/600` … `slate/950` | putih | 7,6 – 20,2 : 1 |
+| `status/*/bg` (3 warna) | `slate/900` | 16,0 – 17,2 : 1 |
+| `white` | `slate/900` | 17,9 : 1 |
+
+> **Larangan `brand/500`:** satu-satunya token tanpa pasangan foreground yang lolos AA. **Jangan pernah memakainya sebagai latar teks.** Boleh sebagai isian, border, garis, atau elemen grafis (grafik, progres, dekorasi). Kalau butuh hijau "terang" sebagai latar teks, pakai `brand/400` dengan teks `slate/900`, atau `brand/600` dengan teks putih.
+
+**Cara praktis memilih teks di atas warna acak** (dipakai di halaman preview token, bukan di UI produk):
+
+```ts
+function luminance(hex: string) {
+  const c = hex.replace("#", "");
+  const v = [0, 2, 4].map((i) => parseInt(c.substr(i, 2), 16) / 255).map((x) =>
+    x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4),
+  );
+  return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+}
+function foreground(hex: string) {
+  return luminance(hex) > 0.35 ? "#0F172A" : "#FFFFFF";
+}
+```
+
+> Jangan pakai `mix-blend-difference` untuk teks di atas permukaan berwarna — hasilnya tidak
+> terjamin kontras (lihat catatan pada §11.2).
+
+### 11.2 Jebakan kontras yang pernah terjadi
+
+| Jebakan | Gejala | Larangan |
+|---|---|---|
+| `mix-blend-difference` untuk label di atas swatch | Warna label jadi keruh/pudar, hampir tak terbaca | Gunakan pasangan foreground dari §11.1 |
+| Menyamakan `emerald-700` dengan `brand/700` | Warna benar-benar berbeda: `#047857` vs `#355A15` | Selalu tulis hex lengkap |
+| Menulis `hsl()` di CSS lalu membandingkan hex | Tailwind v4 membulatkan ke hex dan bisa meleset 1/255 | Tulis **hex** di CSS agar identik dengan dokumen ini |
+
 ---
 
 ## 12. Format Angka & Tanggal
