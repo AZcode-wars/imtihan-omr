@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openomr.dev/schema/exam-template.schema.json",
+  "title": "ExamTemplate",
+  "description": "Metadata koordinat LJK. Dibuat oleh generator PDF (ReportLab), dibaca engine OMR (OpenCV), dan dirender ulang oleh frontend untuk pratinjau. SATU-SATUNYA sumber kebenaran struktur.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "examId",
+    "pageWidthMm",
+    "pageHeightMm",
+    "columnCount",
+    "bubbleDiameterMm",
+    "bubblePitchMm",
+    "fiducials",
+    "nameCropRectMm",
+    "multipleChoiceSlots",
+    "essaySlots"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "examId": { "type": "string", "minLength": 1 },
+    "pageWidthMm": { "type": "number", "exclusiveMinimum": 0 },
+    "pageHeightMm": { "type": "number", "exclusiveMinimum": 0 },
+    "columnCount": { "type": "integer", "minimum": 1 },
+    "bubbleDiameterMm": { "type": "number", "exclusiveMinimum": 0 },
+    "bubblePitchMm": { "type": "number", "exclusiveMinimum": 0 },
+    "fiducials": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/fiducial" }
+    },
+    "nameCropRectMm": { "$ref": "#/$defs/rectMm" },
+    "multipleChoiceSlots": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/mcSlot" }
+    },
+    "essaySlots": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/essaySlot" }
+    }
+  },
+  "$defs": {
+    "rectMm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "w", "h"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0 },
+        "y": { "type": "number", "minimum": 0 },
+        "w": { "type": "number", "exclusiveMinimum": 0 },
+        "h": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "pointMm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["xMm", "yMm"],
+      "properties": {
+        "xMm": { "type": "number", "minimum": 0 },
+        "yMm": { "type": "number", "minimum": 0 }
+      }
+    },
+    "fiducial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["corner", "sizeMm", "xMm", "yMm"],
+      "properties": {
+        "corner": {
+          "type": "string",
+          "enum": ["TOP_LEFT", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_RIGHT"]
+        },
+        "sizeMm": { "type": "number", "exclusiveMinimum": 0 },
+        "xMm": { "type": "number", "minimum": 0 },
+        "yMm": { "type": "number", "minimum": 0 }
+      }
+    },
+    "mcSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["questionNumber", "xMm", "yMm", "options"],
+      "properties": {
+        "questionNumber": { "type": "integer", "minimum": 1 },
+        "xMm": { "type": "number", "minimum": 0 },
+        "yMm": { "type": "number", "minimum": 0 },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "xMm", "yMm"],
+            "properties": {
+              "label": { "type": "string", "enum": ["A", "B", "C", "D"] },
+              "xMm": { "type": "number", "minimum": 0 },
+              "yMm": { "type": "number", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "essaySlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "questionNumber",
+        "xMm",
+        "yMm",
+        "studentAnswerRectMm",
+        "valueOptions",
+        "halfModifierOffset"
+      ],
+      "properties": {
+        "questionNumber": { "type": "integer", "minimum": 1 },
+        "xMm": { "type": "number", "minimum": 0 },
+        "yMm": { "type": "number", "minimum": 0 },
+        "studentAnswerRectMm": {
+          "$ref": "#/$defs/rectMm",
+          "description": "Area kosong tempat siswa menulis jawaban esai. TIDAK dibaca mesin."
+        },
+        "valueOptions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "xMm", "yMm"],
+            "properties": {
+              "value": { "type": "number", "minimum": 0 },
+              "xMm": { "type": "number", "minimum": 0 },
+              "yMm": { "type": "number", "minimum": 0 }
+            }
+          }
+        },
+        "halfModifierOffset": {
+          "$ref": "#/$defs/pointMm",
+          "description": "Kotak [+0.5] di samping lingkaran nilai. Membedakan 2,5 dari 2 atau 3."
+        }
+      }
+    }
+  }
+}

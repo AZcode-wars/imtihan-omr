@@ -1,9 +1,63 @@
 """openomr_schemas — kontrak data bersama OpenOMR.
 
-Isi lengkap (ExamTemplate, OMRScanResponse, model scoring) dikerjakan di Task 2.
-File ini sengaja hanya titik masuk sampai itu.
+Kontrak struktur LJK dikontrak oleh ``schema/exam-template.schema.json``
+(satu-satunya sumber kebenaran). Modul ini adalah cermin Python-nya.
 """
 
-SCHEMAS_VERSION = "0.1.0"
+from .models import (
+    SCHEMAS_VERSION,
+    BubbleReadStatus,
+    Class,
+    DetectedMCAnswer,
+    DetectedEssayScore,
+    EssayQuestionConfig,
+    EssaySlot,
+    EssayValueSlot,
+    ExamConfig,
+    ExamTemplate,
+    Fiducial,
+    FiducialCorner,
+    GradedStudentRecord,
+    McOptionSlot,
+    MultipleChoiceQuestionConfig,
+    MultipleChoiceSlot,
+    OMRScanResponse,
+    OfflineQueueItem,
+    OfflineQueueStatus,
+    OptionLabel,
+    PointMm,
+    QuestionStatus,
+    RectMm,
+    RoundingRule,
+    ScoringMode,
+    Student,
+)
 
-__all__ = ["SCHEMAS_VERSION"]
+__all__ = [
+    "SCHEMAS_VERSION",
+    "BubbleReadStatus",
+    "Class",
+    "DetectedMCAnswer",
+    "DetectedEssayScore",
+    "EssayQuestionConfig",
+    "EssaySlot",
+    "EssayValueSlot",
+    "ExamConfig",
+    "ExamTemplate",
+    "Fiducial",
+    "FiducialCorner",
+    "GradedStudentRecord",
+    "McOptionSlot",
+    "MultipleChoiceQuestionConfig",
+    "MultipleChoiceSlot",
+    "OMRScanResponse",
+    "OfflineQueueItem",
+    "OfflineQueueStatus",
+    "OptionLabel",
+    "PointMm",
+    "QuestionStatus",
+    "RectMm",
+    "RoundingRule",
+    "ScoringMode",
+    "Student",
+]

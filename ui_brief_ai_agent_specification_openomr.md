@@ -54,6 +54,10 @@
 
 AI Agent **wajib** menggunakan definisi tipe data berikut di seluruh komponen frontend tanpa membuat struktur *props* ad-hoc:
 
+> **Lokasi file (v1.1):** tipe-tipe ini kini hidup di paket kontrak **`packages/shared-schemas`** (`src/omr.ts` — TypeScript, `src/openomr_schemas/models.py` — Pydantic), dengan **JSON Schema `schema/exam-template.schema.json` sebagai kontrak tunggal** untuk struktur LJK.
+> `apps/web/src/types/omr.ts` **re-export** dari paket tersebut, jadi path yang disebut di sini tetap berlaku.
+> Aturan: kalau bentuk datanya berubah, ubah **JSON Schema dulu**, baru cermin di TypeScript dan Python — test kontrak (`packages/shared-schemas/tests/test_contract.py`) menangkap kalau cerminnya lupa.
+
 ```typescript
 export type OptionLabel = 'A' | 'B' | 'C' | 'D';
 export type ScoringMode = 'MODE_A_PERCENTAGE' | 'MODE_B_DIRECT_POINTS';

@@ -1,7 +1,10 @@
 /**
  * @openomr/schemas — kontrak bersama antara web, engine, dan generator PDF.
  *
- * Isi lengkap (tipe OMR + JSON Schema ExamTemplate) dikerjakan di Task 2.
- * File ini sengaja hanya titik masuk sampai itu.
+ * Struktur LJK dikontrak oleh `schema/exam-template.schema.json` — satu-satunya
+ * sumber kebenaran. File ini adalah cermin TypeScript-nya.
  */
+
+export * from "./omr";
+
 export const SCHEMAS_VERSION = "0.1.0";

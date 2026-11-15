@@ -39,11 +39,27 @@
   5. `packages/omr-engine` — `uv run python -c "import cv2; print(cv2.__version__)"` harus jalan.
   6. **Keputusan yang perlu kamu konfirmasi:** saya **tidak** menambahkan blok `.dark` (dark mode deferred). `globals.css` sengaja light-only.
 
-## [ ] Task 2 — Fase 1: Kontrak & logika murni
-**Lakukan:** tipe TS `src/types/omr.ts` · **JSON Schema `ExamTemplate`** + validator · model pydantic setara · `src/lib/scoring.ts` (Mode A/B, 3 pembulatan, KKM, Lulus/Remedial) · `vitest` + test table-driven.
+## [x] Task 2 — Fase 1: Kontrak & logika murni ✅
+**Lakukan:** tipe TS `src/omr.ts` · **JSON Schema `ExamTemplate`** + validator · model pydantic setara · `src/lib/scoring.ts` (Mode A/B, 3 pembulatan, KKM, Lulus/Remedial) · `vitest` + test table-driven.
 
-- **Target:** `npm test` hijau; `calculateFinalGrade` ter-cover semua kombinasi mode × pembulatan × kasus batas; `ExamTemplate` divalidasi identik dari TS dan Python.
-- **Tinjau:** tabel test (apakah kasus batas tercakup: 0, 100, 2,5, 1,999, pembulatan); JSON Schema (apakah field mm & sub-bagian zona esai sesuai keputusan Opsi 1).
+**Hasil:**
+- **Kontrak tunggal:** `packages/shared-schemas/schema/exam-template.schema.json` (JSON Schema draft 2020-12) — satu-satunya sumber kebenaran struktur LJK
+- Cermin 3 sisi: `src/omr.ts` (TypeScript), `src/openomr_schemas/models.py` (Pydantic), fixture `schema/example/exam-template.example.json` (25 slot PG + 2 slot esai + 4 fiducial)
+- **12 test kontrak Python** (schema valid, fixture lolos, round-trip Pydantic identik byte-per-byte, 5 uji negatif)
+- **`src/lib/scoring.ts`** — pure function: aturan `ACTIVE`/`BONUS`/`VOID`, penalti, modifier esai `+0,5`, Mode A ternormalisasi (bobot auto dinormalisasi bila ≠100), Mode B poin mentah, 3 aturan pembulatan, `isPassing` (tepat = KKM lulus), `formatFinalScore` locale `id-ID`
+- **36 test vitest** (semua hijau)
+- `apps/web/src/types/omr.ts` re-export dari `@openomr/schemas`; `transpilePackages: ["@openomr/schemas"]` di `next.config.ts`
+- Vitest 4.1.12 + `resolve.tsconfigPaths` native (plugin `vite-tsconfig-paths` dibuang — sudah bawaan Vite)
+
+**Commit:** `feat(2): kontrak ExamTemplate + scoring pure function`
+
+- **Target:** ✅ `npm run test` → 36/36 hijau · ✅ `uv run pytest` di shared-schemas → 12/12 hijau · ✅ `tsc --noEmit` bersih · ✅ `next build` lolos
+- **Tinjau:**
+  1. `packages/shared-schemas/schema/exam-template.schema.json` — cek field `studentAnswerRectMm` ada di `essaySlots` (sub-bagian jawaban siswa) dan terpisah dari `valueOptions` + `halfModifierOffset` (sub-bagian skor guru). Ini keputusan **Opsi 1**.
+  2. `apps/web/src/lib/scoring.ts` — baca aturan `VOID` (dianulir, tak masuk poin & maksimum), `BONUS` (salah → 0, **tidak** kena penalti), `ACTIVE` (salah → `pointsWrong`).
+  3. `src/lib/scoring.test.ts` — 36 test; cek kasus batas: bobot ≠100, tanpa PG, tanpa esai, keduanya kosong, modifier `+0,5`, `baseScore` > `maxScore`, penalti negatif, `ROUND_HALF_UP` untuk negatif.
+  4. **Keputusan yang perlu kamu konfirmasi:** `ROUND_HALF_UP` saya implementasikan **menjauh dari nol** (2,5 → 3 dan −2,5 → −3). Java/`.NET` memakai arah berbeda untuk negatif; kalau mau `ToPositiveInfinity`, bilang saja.
+  5. **Catatan:** `shadcn` CLI dipindah ke `devDependencies` (itu CLI, bukan runtime). `@vitejs/plugin-react` + `jsdom` + testing-library **belum** dipasang — akan dipakai Task 6 untuk test komponen; peer-conflict-nya dengan rantai `@babel` milik CLI `shadcn` perlu diselesaikan saat itu (opsi: `--legacy-peer-deps`, atau lepaskan `shadcn` dari tree saat test).
 
 ## [ ] Task 3 — Fase 2: Engine template & PDF
 **Lakukan:** `omr/template.py` (sumber koordinat: fiducial 14/10 mm, bubble ⌀4,5 mm pitch 8,5 mm, 2 kolom, zona nama, zona esai 2 sub-bagian) · `omr/pdf.py` (ReportLab) · `omr/synth.py` (LJK sintetis + `truth.json`) · CLI `python -m omr.synth`.
@@ -118,5 +134,6 @@
 | Task | Selesai | Commit | Catatan |
 |---|---|---|---|
 | 1 — Fondasi repo | ✅ | `02bceca` | Next 16.4.6 / Tailwind v4.3.3 / shadcn radix-nova / Python 3.13.5. 17/17 token identik. Modul Python bernama `omr_engine` (bukan `omr` — nama device cadangan Windows). |
-| 1 — perbaikan kontras | ✅ | `fixup` | Label warna di halaman preview pakai pasangan foreground terhitung (bukan `mix-blend-difference`). Aturan kontras formal + larangan `brand/500` sebagai latar teks ditambahkan ke `docs/design_tokens.md` §11.1–11.2. |
+| 1 — perbaikan kontras | ✅ | `9b718e1` | Label warna di halaman preview pakai pasangan foreground terhitung (bukan `mix-blend-difference`). Aturan kontras formal + larangan `brand/500` sebagai latar teks ditambahkan ke `docs/design_tokens.md` §11.1–11.2. |
+| 2 — Kontrak & logika | ✅ | `feat(2)` | JSON Schema `ExamTemplate` = kontrak tunggal + cermin TS/Pydantic + fixture. 12 test kontrak Python, 36 test vitest scoring. `shadcn` CLI pindah ke devDependencies. |
 | | | | |
