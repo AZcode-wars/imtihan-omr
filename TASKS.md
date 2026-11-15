@@ -62,35 +62,42 @@
   5. **Catatan:** `shadcn` CLI dipindah ke `devDependencies` (itu CLI, bukan runtime). `@vitejs/plugin-react` + `jsdom` + testing-library **belum** dipasang — akan dipakai Task 6 untuk test komponen; peer-conflict-nya dengan rantai `@babel` milik CLI `shadcn` perlu diselesaikan saat itu (opsi: `--legacy-peer-deps`, atau lepaskan `shadcn` dari tree saat test).
 
 ## [x] Task 3 — Fase 2: Engine template & PDF ✅
+> **Direvisi 2×** setelah review pemilik proyek (lihat "Amemen" di bawah). Hasil akhir tetap "sumber kebenaran geometri" — hanya isinya yang berubah.
+
 **Lakukan:** `omr_engine/template.py` (sumber koordinat) · `omr_engine/pdf.py` (ReportLab) · `omr_engine/synth.py` (LJK sintetis + ground truth, OpenCV) · CLI `python -m omr_engine.synth`.
 
-**Hasil:**
-- **`template.py` = sumber kebenaran geometri.** Semua koordinat dalam **milimeter**, jarak antar pusat antar bubble **persis 8,5 mm** (bukan angka teoretis — `bubblePitchMm` = jarak yang benar-benar dipakai). Menghasilkan dict yang valid menurut JSON Schema kontrak.
+**Hasil akhir:**
+- **`template.py` = sumber kebenaran geometri.** Koordinat dalam **milimeter**; jarak antar pusat antar bubble **persis 6 mm** (bukan angka teoretis — `bubblePitchMm` = jarak yang benar-benar dipakai).
 - **`pdf.py`** — PDF LJK dari koordinat template. MediaBox `595.2756 × 841.8898` pt = tepat A4. Ditulis **tanpa kompresi** supaya koordinatnya bisa diverifikasi.
-- **`synth.py`** — LJK sintetis 840 × 1188 px (4 px/mm) + `truth.json`. Distribusi deterministik: kelipatan 7 → `EMPTY`, 11 → `MULTIPLE`, 13 → `LOW_CONFIDENCE`, sisanya `VALID`; skor esai 0–5 + modifier `+0,5`.
+- **`synth.py`** — LJK sintetis 595 × 842 px (2,8346 px/mm) + `truth.json`. Distribusi deterministik: kelipatan 7 → `EMPTY`, 11 → `MULTIPLE`, 13 → `LOW_CONFIDENCE`, sisanya `VALID`.
 - CLI menghasilkan 4 berkas: `template.json`, `sheet.pdf`, `sheet.png`, `truth.json`.
-- **45 test pytest** — termasuk `test_pdf_geometry.py` yang **membandingkan PDF dengan template**: posisi 4 fiducial & 5 kotak jawaban esai harus cocok, dan jumlah kurva ≥ jumlah lingkaran.
-- Engine sekarang depend pada `openomr-schemas` (editable) → kontrak benar-benar dipakai, bukan diduplikasi.
+- **56 test pytest** — termasuk `test_pdf_geometry.py` (PDF dibandingkan template) dan `test_contract.py` (output engine **wajib** lolos JSON Schema kontrak tunggal).
+- Engine depend pada `openomr-schemas` (editable) → kontrak dipakai langsung, bukan diduplikasi.
 
-**Commit:** `feat(3): engine template + PDF + LJK sintetis`
+**Commit:** `23c6533` → direvisi `4b3e4b9` (layout) → `d829987` (model esai)
 
-**Temuan produk yang perlu kamu putuskan:**
-> **Tidak semua kombinasi jumlah soal muat di satu halaman A4.** Dengan jarak antar pusat 8,5 mm (PRD FR-1.2), batasnya: **0 esai → 50 PG · 5 esai → 30 PG · 10 esai → 10 PG**. Kombinasi lebih besar **ditolak sistem** dengan pesan actionable. Layar `/setup` (Task 6) wajib menampilkan batas ini sebelum guru mencetak. Dokumentasi sudah masuk `docs/screen_specs.md` §8 dan PRD FR-1.1.
-> Kalau ini tidak bisa diterima, alternatifnya **dua halaman** (butuh dukungan multi-page di template, engine, dan pratinjau) — itu keputusan produk, bukan teknis.
+### Amemen setelah review pemilik proyek
 
-**Bug yang ketemu & diperbaiki saat pengerjaan:**
-- Zona esai dipaksa mulai di y=164 → ruang 78 mm terbuang. Sekarang menempel di bawah zona PG + celah.
-- Kompresi tata letak bisa membuat **kotak jawaban esai saling tumpang tindih** (tinggi 16 mm, jarak 14 mm). Sekarang jarak antar blok **wajib ≥ tinggi kotak + 4 mm**.
-- Batas bawah konten awalnya 282 mm → konten bisa menabrak pita fiducial bawah (277–287 mm). Sekarang 272 mm.
-- Judul "II. ZONA SKOR ESAI" menabrak baris PG 13. Sekarang posisinya relatif terhadap zona esai.
-- **Kotak "KELAS / NO. ABSEN" digambar di PDF tapi tidak di LJK sintetis** — sekarang keduanya pakai konstanta yang sama (`CLASS_BOX_RECT_MM` di `template.py`).
+**Amemen 1 — Layout LJK (commit `4b3e4b9`)**
+- Jarak antar pusat bubble 8,5 → **6 mm** (PRD FR-1.2 direvisi atas persetujuan pemilik proyek)
+- Kolom PG ke-2: x=108 → **62 mm**; margin fiducial 10 → **8 mm**; judul utama → x=25 mm (di kanan fiducial, sebelumnya menyelisip di bawahnya)
+- Ditambah **kotak PETUNJUK** di ruang kosong kanan zona PG
+- Kapasitas naik: 0–4 esai → 50 PG · 5 esai → 44 · 8 esai → 26 · 10 esai → 14
 
-- **Target:** ✅ `uv run pytest` → 45/45 hijau · ✅ CLI menghasilkan 4 berkas · ✅ `template.json` lolos JSON Schema · ✅ PDF = A4, 1 halaman, koordinat cocok template · ✅ LJK sintetis terverifikasi visual
+**Amemen 2 — Model esai (commit `d829987`)**
+- Zona esai **tidak lagi** memuat lingkaran skor 0–5 + `[+.5]`. Tinggal satu area kosong **selebar penuh (164 mm)** per nomor, tinggi dibagi rata, nomor esai **terpisah** dari PG (`E1…EM`)
+- Skor esai **dinilai guru di aplikasi**: tombol Benar/Salah + kolom skor parsial (Benar → otomatis poin penuh; Salah → otomatis 0; diubah manual → `PARTIAL`)
+- Kontrak: `ExamTemplate.essaySlots` kehilangan `valueOptions` + `halfModifierOffset`; `DetectedEssayScore` → `EssayMark` + `EssayAnswerCrop`; `OMRScanResponse.essayScores` → `essayCrops`
+- **FigCraft**: mock LJK diganti **output nyata dari engine** (PNG), dan Zone 4 sheet verifikasi dibangun ulang — supaya prototipe tidak pernah jadi sumber kebenaran kedua
+
+**Risiko yang masih terbuka (wajib diuji Task 4):** celah antar bubble kini hanya **1,5 mm** (dari 4 mm). Keandalan baca pada pensil sungguhan (retis, pencahayaan redup) **belum dibuktikan** — itu PR wajib sebelum rilis.
+
+- **Target:** ✅ engine 56/56 · ✅ kontrak 13/13 · ✅ web 41/41 + tsc bersih · ✅ CLI 4 berkas · ✅ template.json lolos JSON Schema · ✅ PDF = A4, koordinat cocok template · ✅ LJK sintetis terverifikasi visual
 - **Tinjau:**
-  1. `packages/omr-engine/out/sheet.png` — bandingkan dengan `prototype/previews/05-ljk-a4.png`. Seharusnya ada: 4 fiducial (kiri-atas lebih besar), zona nama, 2 kolom 25 PG, 5 blok esai dengan kotak tulis + 6 lingkaran + `[.5]`.
-  2. `out/truth.json` — cek status per nomor (7/14/21 kosong, 11/22 dobel, 13 arsiran tipis).
-  3. `src/omr_engine/template.py` — baca `compute_layout()`: urutan kompresi (tinggi kotak lalu jarak antar blok) dan syarat `pitch >= tinggi + 4`.
-  4. `src/omr_engine/synth.py` — `plan_answers()` menentukan ground truth; Task 4 akan menguji engine terhadap file ini.
+  1. `packages/omr-engine/out/sheet.png` — LJK final: 4 fiducial, judul di kanan fiducial, 2 kolom rapat, PETUNJUK, 5 kotak esai lebar tanpa lingkaran.
+  2. `out/truth.json` — status per nomor (7/14/21 kosong, 11/22 dobel, 13 arsiran tipis); bagian `essay` kini berisi posisi area jawaban.
+  3. `prototype/previews/05-ljk-a4.png` — harus **identik** dengan `out/sheet.png` (planted sebagai output nyata).
+  4. `prototype/previews/03-mobile-05-verify-sheet.png` — Zone 4 versi baru (guru menilai).
 
 ## [ ] Task 4 — Fase 3: Engine pembacaan citra
 **Lakukan:** `omr/imaging.py` (deteksi 4 fiducial, verifikasi orientasi, 4-point transform ke 800×1100, adaptive threshold) · `omr/grade.py` (rasio piksel → `VALID`/`EMPTY`/`MULTIPLE`/`LOW_CONFIDENCE`, baca zona esai, crop nama).
