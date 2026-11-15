@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>OpenOMR - Prototipe UI Mobile Scanner</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts: Plus Jakarta Sans & Caveat (untuk simulasi tulisan tangan nama siswa) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            handwriting: ['"Caveat"', 'cursive'],
+          },
+          colors: {
+            brand: {
+              50: '#f3f7ef',
+              100: '#e3edd9',
+              200: '#c7dcb5',
+              300: '#a2c487',
+              400: '#7da95d',
+              500: '#5d8b3e',
+              600: '#476e2e',
+              700: '#355A15', // Primary Deep Green
+              800: '#24400E', // Darker Primary Deep Green
+              900: '#1c330c',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom scrollbar & mobile frame styling */
+    body {
+      background-color: #e5e7eb;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Hide scrollbar for clean mobile look */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Scanning laser animation */
+    @keyframes scanLine {
+      0% { top: 8%; opacity: 0.3; }
+      50% { top: 88%; opacity: 1; }
+      100% { top: 8%; opacity: 0.3; }
+    }
+    .animate-scan {
+      animation: scanLine 2.8s ease-in-out infinite;
+    }
+
+    /* Bottom sheet slide up animation */
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .animate-slide-up {
+      animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Range slider styling */
+    input[type="range"] {
+      accent-color: #355A15;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center sm:py-6 font-sans text-slate-800 antialiased">
+
+  <!-- Mobile App Container: Full viewport on mobile, centered phone frame on desktop -->
+  <div id="app-shell" class="relative w-full h-[100dvh] sm:w-[400px] sm:h-[820px] sm:rounded-[2.5rem] sm:border-[8px] sm:border-slate-900 bg-slate-50 shadow-2xl overflow-hidden flex flex-col">
+
+    <!-- Status Bar (Desktop visual polish) -->
+    <div class="hidden sm:flex items-center justify-between px-6 pt-2.5 pb-1 bg-brand-800 text-white text-[11px] font-semibold select-none">
+      <span>21:48</span>
+      <div class="w-20 h-4 bg-slate-900 rounded-full"></div>
+      <div class="flex items-center gap-1.5">
+        <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+        <i data-lucide="battery-charging" class="w-4 h-4"></i>
+      </div>
+    </div>
+
+    <!-- Top App Header -->
+    <header class="bg-brand-800 text-white px-4 py-3 flex items-center justify-between shrink-0 z-20 shadow-sm">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-xl bg-brand-700 border border-brand-500/40 flex items-center justify-center shadow-inner">
+          <i data-lucide="scan-line" class="w-4 h-4 text-emerald-200"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="font-bold text-sm tracking-tight leading-none">OpenOMR</h1>
+            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand-700 text-emerald-200 border border-brand-500/30">MVP</span>
+          </div>
+          <p id="header-exam-title" class="text-[11px] text-emerald-100/80 mt-0.5 truncate max-w-[200px]">UTS Matematika - Kelas 8A</p>
+        </div>
+      </div>
+
+      <!-- Offline Queue / Sync Status Badge -->
+      <button onclick="toggleOfflineDemo()" id="sync-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-700/90 hover:bg-brand-700 border border-brand-500/30 text-[11px] font-medium transition active:scale-95" title="Klik untuk simulasi mode offline">
+        <span id="sync-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="sync-text">Online</span>
+      </button>
+    </header>
+
+    <!-- MAIN VIEWPORT CONTENT (Switches between 3 tabs) -->
+    <main class="flex-1 overflow-y-auto no-scrollbar relative bg-slate-50">
+
+      <!-- ========================================================= -->
+      <!-- TAB 1: UJIAN & ATURAN (Exam Setup & Scoring Rules)         -->
+      <!-- ========================================================= -->
+      <section id="view-setup" class="hidden p-4 pb-24 space-y-4">
+        
+        <!-- Exam Identity Card -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-brand-700">Identitas Ujian</span>
+            <span class="text-[11px] text-slate-400 font-medium">Kertas A4 • 2 Kolom</span>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Judul Ujian & Kelas</label>
+            <input type="text" id="input-exam-title" value="UTS Matematika - Kelas 8A" oninput="updateExamConfig()"
+              class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:border-brand-700 focus:ring-2 focus:ring-brand-700/15" />
+          </div>
+        </div>
+
+        <!-- Dynamic Question Count Card -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-brand-700">Struktur Soal Dinamis</span>
+            <button onclick="openLjkPreviewModal()" class="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 px-2.5 py-1 rounded-lg transition">
+              <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+              Pratinjau LJK A4
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <!-- PG Count -->
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">Pilihan Ganda (A–D)</label>
+              <div class="flex items-center justify-between">
+                <button onclick="adjustQuestionCount('pg', -1)" class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-700 font-bold active:scale-95">-</button>
+                <span id="display-pg-count" class="text-lg font-extrabold text-slate-800">25</span>
+                <button onclick="adjustQuestionCount('pg', 1)" class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-700 font-bold active:scale-95">+</button>
+              </div>
+              <p class="text-[10px] text-slate-400 mt-1.5 text-center">Maks. 50 soal / lembar</p>
+            </div>
+
+            <!-- Essay Count -->
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">Esai (Skor 0–5 / +.5)</label>
+              <div class="flex items-center justify-between">
+                <button onclick="adjustQuestionCount('essay', -1)" class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-700 font-bold active:scale-95">-</button>
+                <span id="display-essay-count" class="text-lg font-extrabold text-slate-800">5</span>
+                <button onclick="adjustQuestionCount('essay', 1)" class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-700 font-bold active:scale-95">+</button>
+              </div>
+              <p class="text-[10px] text-slate-400 mt-1.5 text-center">Zona arsiran guru</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scoring Mode Toggle (Mode A vs Mode B) -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3.5">
+          <span class="text-xs font-bold uppercase tracking-wider text-brand-700 block">Aturan Pembobotan Nilai</span>
+
+          <!-- Segmented Control -->
+          <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-xl">
+            <button id="btn-mode-a" onclick="setScoringMode('MODE_A')" class="py-2 px-2.5 rounded-lg text-xs font-bold bg-white text-brand-800 shadow-sm transition">
+              Mode A: Persentase
+            </button>
+            <button id="btn-mode-b" onclick="setScoringMode('MODE_B')" class="py-2 px-2.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-700 transition">
+              Mode B: Poin Langsung
+            </button>
+          </div>
+
+          <!-- Mode A Details -->
+          <div id="panel-mode-a" class="space-y-3 pt-1">
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Sistem menormalisasi skor mentah PG dan Esai ke dalam porsi persentase berikut (total 100%):
+            </p>
+            <div class="space-y-2">
+              <div class="flex justify-between text-xs font-bold">
+                <span class="text-brand-700">Bobot PG: <span id="label-pg-weight">60</span>%</span>
+                <span class="text-amber-700">Bobot Esai: <span id="label-essay-weight">40</span>%</span>
+              </div>
+              <input type="range" id="slider-weight" min="0" max="100" step="5" value="60" oninput="updateWeightSlider(this.value)" class="w-full cursor-pointer" />
+              <div class="flex justify-between text-[10px] text-slate-400">
+                <span>100% Esai</span>
+                <span>50 : 50</span>
+                <span>100% PG</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mode B Details -->
+          <div id="panel-mode-b" class="hidden space-y-3 pt-1">
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Nilai akhir adalah penjumlahan langsung dari total poin PG dan total poin Esai yang diperoleh siswa.
+            </p>
+            <div class="grid grid-cols-2 gap-2.5">
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[11px] text-slate-500 block">Poin per PG Benar</span>
+                <input type="number" id="input-pg-point" value="2" min="1" max="10" onchange="updateExamConfig()" class="mt-1 w-full font-bold text-sm bg-white px-2.5 py-1.5 rounded-lg border border-slate-200" />
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[11px] text-slate-500 block">Maks. Poin per Esai</span>
+                <input type="number" id="input-essay-point" value="10" min="1" max="25" onchange="updateExamConfig()" class="mt-1 w-full font-bold text-sm bg-white px-2.5 py-1.5 rounded-lg border border-slate-200" />
+              </div>
+            </div>
+            <div id="mode-b-total-indicator" class="text-[11px] font-semibold px-3 py-2 rounded-lg bg-brand-50 text-brand-800 flex items-center justify-between">
+              <span>Total Skor Maksimal Ujian:</span>
+              <span id="mode-b-max-score" class="font-extrabold">100 Poin</span>
+            </div>
+          </div>
+
+          <!-- Rounding Rule -->
+          <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-600">Pembulatan Nilai Akhir</span>
+            <select id="select-rounding" onchange="updateExamConfig()" class="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 focus:outline-none focus:border-brand-700">
+              <option value="EXACT_1">1 Desimal (81.5)</option>
+              <option value="ROUND">Bulat Standar (82)</option>
+              <option value="CEIL">Bulat ke Atas (82)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- CTA to jump to scanner -->
+        <button onclick="switchTab('scan')" class="w-full py-3.5 rounded-2xl bg-brand-700 hover:bg-brand-800 text-white font-bold text-sm shadow-lg shadow-brand-700/20 flex items-center justify-center gap-2 transition active:scale-[0.99]">
+          <i data-lucide="camera" class="w-4 h-4"></i>
+          Simpan Aturan & Mulai Scan LJK
+        </button>
+      </section>
+
+
+      <!-- ========================================================= -->
+      <!-- TAB 2: SCAN LJK (Default Active Tab - Smart Viewfinder)   -->
+      <!-- ========================================================= -->
+      <section id="view-scan" class="h-full flex flex-col bg-slate-950 text-white relative select-none">
+
+        <!-- Camera Top Controls Overlay -->
+        <div class="absolute top-3 left-3 right-3 z-20 flex items-center justify-between">
+          <div class="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="text-[11px] font-semibold text-white/90">
+              Terscan: <strong id="scan-counter-badge" class="text-emerald-300">24/30</strong> Siswa
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Toggle Real Webcam vs Simulated LJK -->
+            <button onclick="toggleCameraSource()" id="btn-cam-source" class="px-2.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[11px] font-semibold text-white/90 hover:bg-black/80 transition flex items-center gap-1.5">
+              <i data-lucide="video" class="w-3.5 h-3.5 text-emerald-300"></i>
+              <span id="cam-source-label">Demo LJK</span>
+            </button>
+
+            <!-- Torch / Flash Toggle -->
+            <button onclick="toggleTorch()" id="btn-torch" class="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md border border-white/15 flex items-center justify-center text-white/80 hover:text-white transition">
+              <i data-lucide="flashlight" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Viewfinder Area -->
+        <div class="flex-1 relative flex items-center justify-center overflow-hidden p-5">
+          
+          <!-- Optional Real Camera Video Element -->
+          <video id="real-camera-video" autoplay playsinline muted class="hidden absolute inset-0 w-full h-full object-cover"></video>
+
+          <!-- Simulated Realistic LJK Paper inside Camera View -->
+          <div id="simulated-paper-bg" class="relative w-full max-w-[295px] aspect-[1/1.41] bg-[#fafaf8] rounded-md shadow-2xl p-3.5 text-slate-800 transform -rotate-1 transition-all duration-300 border border-slate-300">
+            <!-- 4 Fiducial Markers -->
+            <div class="absolute top-2.5 left-2.5 w-4 h-4 bg-slate-950"></div> <!-- Top-left larger marker -->
+            <div class="absolute top-2.5 right-2.5 w-3 h-3 bg-slate-950"></div>
+            <div class="absolute bottom-2.5 left-2.5 w-3 h-3 bg-slate-950"></div>
+            <div class="absolute bottom-2.5 right-2.5 w-3 h-3 bg-slate-950"></div>
+
+            <!-- Simulated LJK Header -->
+            <div class="mt-4 mx-2 border-b border-slate-400 pb-1.5 flex items-end justify-between">
+              <div>
+                <p class="text-[8px] font-bold uppercase tracking-wider text-slate-500">Lembar Jawaban Komputer</p>
+                <p id="paper-handwriting-preview" class="font-handwriting text-lg text-slate-900 leading-none mt-0.5">Ahmad Fauzan</p>
+              </div>
+              <span class="text-[8px] font-bold px-1.5 py-0.5 bg-slate-200 rounded text-slate-700">KLS 8A</span>
+            </div>
+
+            <!-- Simulated 2-Column A-D Bubbles -->
+            <div class="mt-2.5 mx-2 grid grid-cols-2 gap-3 text-[7px] font-mono">
+              <!-- Column 1 -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between"><span>01</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>02</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>03</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>04</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>05</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>06</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>07</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+              </div>
+              <!-- Column 2 (with flagged No. 14 thin shading & No. 21 double shading) -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between bg-amber-100/80 px-0.5 rounded"><span>14</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full bg-slate-400 border border-slate-600 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>15</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>16</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>17</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>18</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+                <div class="flex items-center justify-between"><span>19</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+                <div class="flex items-center justify-between bg-rose-100/80 px-0.5 rounded"><span>21</span><span class="flex gap-1"><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i><i class="w-2 h-2 rounded-full bg-slate-900 inline-block"></i><i class="w-2 h-2 rounded-full border border-slate-500 inline-block"></i></span></div>
+              </div>
+            </div>
+
+            <!-- Simulated Teacher Essay Scoring Zone (0-5 + +.5) -->
+            <div class="mt-3 mx-2 pt-2 border-t border-dashed border-slate-400">
+              <p class="text-[6.5px] font-bold uppercase text-slate-600 mb-1">Diisi Guru — Skor Esai (0–5 & +.5)</p>
+              <div class="space-y-1 text-[6.5px] font-mono">
+                <div class="flex items-center justify-between">
+                  <span>E1</span>
+                  <span class="flex items-center gap-0.5">
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full bg-slate-900"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <span class="ml-1 px-0.5 border border-slate-500 rounded-[2px] text-[5px]">+.5</span>
+                  </span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>E2</span>
+                  <span class="flex items-center gap-0.5">
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full bg-slate-900"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <span class="ml-1 px-0.5 bg-slate-900 text-white rounded-[2px] text-[5px]">+.5</span>
+                  </span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>E4</span>
+                  <span class="flex items-center gap-0.5">
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full bg-slate-900"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <i class="w-1.5 h-1.5 rounded-full border border-slate-500"></i>
+                    <span class="ml-1 px-0.5 bg-slate-900 text-white rounded-[2px] text-[5px]">+.5</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- A4 Alignment Corner Guides Overlay (Turns bright emerald when ready) -->
+          <div id="viewfinder-frame" class="pointer-events-none absolute inset-x-7 inset-y-12 max-w-[325px] mx-auto transition-all duration-300">
+            <!-- Top Left Corner -->
+            <div class="corner-bracket absolute top-0 left-0 w-9 h-9 border-t-4 border-l-4 border-emerald-400 rounded-tl-xl transition-colors"></div>
+            <!-- Top Right Corner -->
+            <div class="corner-bracket absolute top-0 right-0 w-9 h-9 border-t-4 border-r-4 border-emerald-400 rounded-tr-xl transition-colors"></div>
+            <!-- Bottom Left Corner -->
+            <div class="corner-bracket absolute bottom-0 left-0 w-9 h-9 border-b-4 border-l-4 border-emerald-400 rounded-bl-xl transition-colors"></div>
+            <!-- Bottom Right Corner -->
+            <div class="corner-bracket absolute bottom-0 right-0 w-9 h-9 border-b-4 border-r-4 border-emerald-400 rounded-br-xl transition-colors"></div>
+
+            <!-- Animated Laser Line -->
+            <div class="animate-scan absolute left-3 right-3 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399]"></div>
+
+            <!-- Status Pill inside Viewfinder -->
+            <div class="absolute bottom-3 left-1/2 -translate-x-1/2 bg-emerald-950/85 border border-emerald-400/40 backdrop-blur-sm px-3 py-1 rounded-full whitespace-nowrap">
+              <p id="viewfinder-status-text" class="text-[11px] font-semibold text-emerald-300 flex items-center gap-1.5">
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                4 Sudut Terdeteksi • Siap Capture
+              </p>
+            </div>
+          </div>
+
+          <!-- Torch Light Wash Effect -->
+          <div id="torch-overlay" class="hidden pointer-events-none absolute inset-0 bg-amber-100/15 mix-blend-screen"></div>
+        </div>
+
+        <!-- Bottom Camera Action Bar -->
+        <div class="bg-slate-900/95 border-t border-white/10 px-5 pt-3.5 pb-20 flex flex-col items-center gap-2.5 z-20">
+          <button onclick="triggerAutoCapture()" id="btn-auto-capture" class="w-full py-3.5 px-5 rounded-2xl bg-brand-700 hover:bg-brand-600 active:scale-[0.98] text-white font-bold text-sm shadow-lg shadow-emerald-950/50 border border-emerald-400/30 flex items-center justify-center gap-2.5 transition">
+            <span class="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center">
+              <i data-lucide="scan" class="w-4 h-4 text-emerald-200"></i>
+            </span>
+            <span>Simulasikan Auto-Capture</span>
+          </button>
+          <p class="text-[11px] text-slate-400 text-center">
+            Di kelas, kamera otomatis memotret saat 4 kotak sudut stabil ±0.5 detik
+          </p>
+        </div>
+      </section>
+
+
+      <!-- ========================================================= -->
+      <!-- TAB 3: REKAP NILAI (Class Gradebook & CSV Export)         -->
+      <!-- ========================================================= -->
+      <section id="view-grades" class="hidden p-4 pb-24 space-y-4">
+
+        <!-- Class Summary KPI Cards -->
+        <div class="grid grid-cols-3 gap-2.5">
+          <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm">
+            <span class="text-[10px] font-bold uppercase text-slate-400 block">Rata-Rata</span>
+            <span id="stat-avg" class="text-xl font-extrabold text-brand-800 mt-0.5 block">79.4</span>
+            <span class="text-[10px] text-emerald-600 font-semibold">KKM: 75</span>
+          </div>
+          <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm">
+            <span class="text-[10px] font-bold uppercase text-slate-400 block">Tertinggi</span>
+            <span id="stat-max" class="text-xl font-extrabold text-slate-800 mt-0.5 block">94.0</span>
+            <span class="text-[10px] text-slate-500 font-medium truncate block">Siti Nurhaliza</span>
+          </div>
+          <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm">
+            <span class="text-[10px] font-bold uppercase text-slate-400 block">Terscan</span>
+            <span id="stat-scanned" class="text-xl font-extrabold text-brand-700 mt-0.5 block">24/30</span>
+            <span id="stat-remaining" class="text-[10px] text-amber-600 font-semibold">Sisa 6 lembar</span>
+          </div>
+        </div>
+
+        <!-- Search & Export Bar -->
+        <div class="flex items-center gap-2">
+          <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input type="text" id="grade-search-input" oninput="renderGradebook()" placeholder="Cari nama siswa..."
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-medium focus:outline-none focus:border-brand-700" />
+          </div>
+          <button onclick="exportMockCSV()" class="px-3.5 py-2.5 rounded-xl bg-brand-700 hover:bg-brand-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition shrink-0">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            Export CSV
+          </button>
+        </div>
+
+        <!-- Student Grade List -->
+        <div class="space-y-2" id="gradebook-list">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ========================================================= -->
+    <!-- BOTTOM NAVIGATION BAR (3 Tabs)                            -->
+    <!-- ========================================================= -->
+    <nav class="absolute bottom-0 inset-x-0 bg-white border-t border-slate-200 px-3 py-2 flex items-center justify-around z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.04)]">
+      <button onclick="switchTab('setup')" id="nav-setup" class="nav-item flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-slate-400 hover:text-slate-600 transition">
+        <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+        <span class="text-[11px] font-semibold">Ujian & Aturan</span>
+      </button>
+
+      <button onclick="switchTab('scan')" id="nav-scan" class="nav-item flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-brand-700 transition">
+        <div class="relative">
+          <i data-lucide="scan-line" class="w-5 h-5"></i>
+        </div>
+        <span class="text-[11px] font-bold">Scan LJK</span>
+      </button>
+
+      <button onclick="switchTab('grades')" id="nav-grades" class="nav-item flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-slate-400 hover:text-slate-600 transition relative">
+        <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+        <span class="text-[11px] font-semibold">Rekap Nilai</span>
+      </button>
+    </nav>
+
+
+    <!-- ========================================================= -->
+    <!-- MODAL 1: QUICK VERIFICATION BOTTOM-SHEET (Human-in-Loop)  -->
+    <!-- ========================================================= -->
+    <div id="verification-modal" class="hidden absolute inset-0 z-40 bg-slate-950/75 backdrop-blur-xs flex flex-col justify-end">
+      
+      <!-- Modal Sheet -->
+      <div class="animate-slide-up bg-white rounded-t-3xl max-h-[92%] flex flex-col shadow-2xl overflow-hidden">
+        
+        <!-- Sheet Drag Handle & Header -->
+        <div class="px-4 pt-2.5 pb-2 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <h2 class="font-bold text-sm text-slate-800">Verifikasi Hasil Scan</h2>
+          </div>
+          <button onclick="closeVerificationModal()" class="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Scrollable Verification Body -->
+        <div class="p-4 overflow-y-auto no-scrollbar space-y-4">
+
+          <!-- ZONE 1: Cropped Handwritten Name + Smart Student Dropdown -->
+          <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200/80 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Potongan Tulisan Nama (Auto-Crop)</span>
+              <span class="text-[10px] font-semibold text-brand-700 bg-brand-100 px-2 py-0.5 rounded-full">Sisa <span id="unscanned-count-label">6</span> siswa</span>
+            </div>
+
+            <!-- Simulated Cropped Image of Handwritten Name -->
+            <div class="bg-[#fcfcf9] border border-dashed border-slate-300 rounded-xl px-3.5 py-2 flex items-center justify-between shadow-inner">
+              <div>
+                <span class="text-[9px] uppercase text-slate-400 block font-mono">NAMA SISWA:</span>
+                <p id="crop-handwriting-name" class="font-handwriting text-2xl font-bold text-slate-900 tracking-wide">Ahmad Fauzan</p>
+              </div>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Kelas 8A</span>
+            </div>
+
+            <!-- Smart Dropdown (Filters out already-scanned students) -->
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 mb-1">Cocokkan Nama Siswa di Daftar Kelas:</label>
+              <select id="student-select-dropdown" class="w-full px-3 py-2.5 rounded-xl bg-white border-2 border-brand-700/40 text-sm font-bold text-slate-800 focus:outline-none focus:border-brand-700">
+                <!-- Populated dynamically with unscanned students -->
+              </select>
+            </div>
+          </div>
+
+          <!-- ZONE 2: Dynamic Summary Score Card -->
+          <div class="bg-gradient-to-br from-brand-800 to-brand-700 rounded-2xl p-3.5 text-white shadow-md flex items-center justify-between">
+            <div class="space-y-1">
+              <p class="text-[11px] text-emerald-100/80 font-medium">Ringkasan Skor Terbaca</p>
+              <div class="flex items-center gap-2 text-xs font-bold">
+                <span class="bg-white/15 px-2 py-0.5 rounded-lg">PG: <span id="verify-pg-summary">22/25</span></span>
+                <span class="bg-white/15 px-2 py-0.5 rounded-lg">Esai: <span id="verify-essay-summary">18.5/25</span></span>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] uppercase tracking-wider text-emerald-200 block font-semibold">Nilai Akhir</span>
+              <span id="verify-final-score" class="text-3xl font-extrabold tracking-tight">81.0</span>
+            </div>
+          </div>
+
+          <!-- ZONE 3: Exception-First Warning Chips -->
+          <div id="exception-zone" class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-500"></i>
+                Perlu Dicek (<span id="flagged-count">2</span> Nomor)
+              </span>
+              <span class="text-[10px] text-slate-400">Tap untuk koreksi 1-klik</span>
+            </div>
+
+            <!-- Chips Row -->
+            <div id="flagged-chips-container" class="flex flex-wrap gap-2">
+              <!-- Populated dynamically -->
+            </div>
+
+            <!-- Inline 1-Click Bubble Fix Drawer (Appears when a chip is tapped) -->
+            <div id="inline-bubble-editor" class="hidden mt-2 p-3 rounded-2xl bg-amber-50/90 border border-amber-200 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span id="editor-question-label" class="text-xs font-extrabold text-amber-900">Koreksi Soal No. 14</span>
+                <span id="editor-issue-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900">Arsiran Tipis (48%)</span>
+              </div>
+
+              <!-- Zoomed Crop Preview of the Flagged Bubble Row -->
+              <div class="bg-white rounded-xl p-2 border border-amber-200/80 flex items-center justify-between">
+                <span class="text-[10px] font-mono text-slate-400">Crop LJK:</span>
+                <div id="zoomed-bubble-visual" class="flex items-center gap-3 px-2">
+                  <!-- Rendered dynamically -->
+                </div>
+                <span class="text-[10px] font-semibold text-brand-700">Kunci: <strong id="editor-key-hint">B</strong></span>
+              </div>
+
+              <!-- 1-Click Override Buttons -->
+              <div class="grid grid-cols-5 gap-1.5">
+                <button onclick="applyBubbleFix('A')" class="fix-opt-btn py-2 rounded-xl bg-white border border-slate-200 font-extrabold text-xs text-slate-700 hover:border-brand-700 active:scale-95 transition">A</button>
+                <button onclick="applyBubbleFix('B')" class="fix-opt-btn py-2 rounded-xl bg-white border border-slate-200 font-extrabold text-xs text-slate-700 hover:border-brand-700 active:scale-95 transition">B</button>
+                <button onclick="applyBubbleFix('C')" class="fix-opt-btn py-2 rounded-xl bg-white border border-slate-200 font-extrabold text-xs text-slate-700 hover:border-brand-700 active:scale-95 transition">C</button>
+                <button onclick="applyBubbleFix('D')" class="fix-opt-btn py-2 rounded-xl bg-white border border-slate-200 font-extrabold text-xs text-slate-700 hover:border-brand-700 active:scale-95 transition">D</button>
+                <button onclick="applyBubbleFix(null)" class="fix-opt-btn py-2 rounded-xl bg-white border border-slate-200 font-bold text-[11px] text-rose-600 hover:border-rose-500 active:scale-95 transition">Kosong</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ZONE 4: Essay Score Quick-Edit Row (Supports .5 increments) -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-700">Skor Esai Terbaca (0–5 & +.5)</span>
+              <span class="text-[10px] text-slate-400">Tap - / + untuk ubah 0.5</span>
+            </div>
+
+            <div id="essay-scores-grid" class="grid grid-cols-2 gap-2">
+              <!-- Populated dynamically: E1 to E5 -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Sticky Thumb-Friendly Primary CTA -->
+        <div class="p-4 bg-white border-t border-slate-100 shrink-0">
+          <button onclick="saveAndNextScan()" class="w-full py-3.5 px-5 rounded-2xl bg-brand-700 hover:bg-brand-800 active:scale-[0.98] text-white font-bold text-sm shadow-lg shadow-brand-700/25 flex items-center justify-center gap-2 transition">
+            <span>Simpan & Scan Berikutnya</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ========================================================= -->
+    <!-- MODAL 2: PRATINJAU TEMPLATE LJK A4 (From Tab 1)           -->
+    <!-- ========================================================= -->
+    <div id="ljk-preview-modal" class="hidden absolute inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl w-full max-w-[350px] overflow-hidden shadow-2xl flex flex-col max-h-[88%]">
+        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-sm text-slate-800">Blueprint LJK A4 Dinamis</h3>
+            <p class="text-[11px] text-slate-500">Koordinat otomatis sinkron dengan JSON</p>
+          </div>
+          <button onclick="closeLjkPreviewModal()" class="p-1.5 rounded-full bg-slate-100 text-slate-600">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="p-4 overflow-y-auto bg-slate-100 flex justify-center">
+          <!-- Miniature A4 Sheet Blueprint -->
+          <div class="w-full bg-white border border-slate-300 shadow-md p-4 relative text-slate-800">
+            <!-- 4 Fiducial Markers -->
+            <div class="w-4 h-4 bg-black absolute top-2.5 left-2.5" title="Marker Kiri-Atas (14x14mm - Orientasi)"></div>
+            <div class="w-3 h-3 bg-black absolute top-2.5 right-2.5" title="Marker Kanan-Atas (10x10mm)"></div>
+            <div class="w-3 h-3 bg-black absolute bottom-2.5 left-2.5" title="Marker Kiri-Bawah (10x10mm)"></div>
+            <div class="w-3 h-3 bg-black absolute bottom-2.5 right-2.5" title="Marker Kanan-Bawah (10x10mm)"></div>
+
+            <div class="mt-4 text-center border-b border-slate-300 pb-2">
+              <p id="preview-sheet-title" class="text-[10px] font-extrabold uppercase">UTS Matematika - Kelas 8A</p>
+              <div class="mt-2 grid grid-cols-2 gap-2 text-left text-[9px]">
+                <div class="border border-dashed border-brand-600 bg-brand-50/40 p-1.5 rounded">
+                  <span class="text-slate-400 block text-[7px]">AREA CROP NAMA:</span>
+                  <span class="font-semibold text-slate-700">Nama: _______________</span>
+                </div>
+                <div class="border border-slate-300 p-1.5 rounded">
+                  <span class="text-slate-400 block text-[7px]">KELAS / NO:</span>
+                  <span class="font-semibold text-slate-700">Kelas: ______________</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dynamic PG Preview -->
+            <div class="mt-2.5">
+              <p class="text-[8px] font-bold uppercase text-slate-500 mb-1.5">
+                I. Pilihan Ganda (<span id="preview-pg-count">25</span> Soal • Opsi A–D)
+              </p>
+              <div id="preview-pg-grid" class="grid grid-cols-2 gap-x-4 gap-y-1 text-[8px] font-mono">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Dynamic Essay Scoring Preview -->
+            <div id="preview-essay-section" class="mt-3 pt-2 border-t border-slate-300">
+              <p class="text-[8px] font-bold uppercase text-brand-800 mb-1.5">
+                II. Zona Skor Esai — Diisi Guru (<span id="preview-essay-count">5</span> Soal)
+              </p>
+              <div id="preview-essay-grid" class="space-y-1 text-[8px] font-mono">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3.5 bg-white border-t border-slate-100">
+          <button onclick="closeLjkPreviewModal()" class="w-full py-2.5 rounded-xl bg-brand-700 text-white text-xs font-bold">
+            Tutup Pratinjau
+          </button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================= -->
+    <!-- TOAST NOTIFICATION                                        -->
+    <!-- ========================================================= -->
+    <div id="toast-notification" class="hidden absolute top-16 left-4 right-4 z-50 bg-slate-900/95 text-white px-4 py-3 rounded-2xl shadow-xl border border-white/10 flex items-center gap-2.5 text-xs font-semibold transition-all">
+      <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+      <span id="toast-message">Data berhasil disimpan!</span>
+    </div>
+
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- INTERACTIVE PROTOTYPE LOGIC                               -->
+  <!-- ========================================================= -->
+  <script>
+    // 1. INITIAL STATE & MOCK DATA
+    const state = {
+      activeTab: 'scan',
+      isOffline: false,
+      offlineQueueCount: 0,
+      torchOn: false,
+      usingRealCamera: false,
+      mediaStream: null,
+
+      // Exam Configuration (Tab 1)
+      examTitle: 'UTS Matematika - Kelas 8A',
+      pgCount: 25,
+      essayCount: 5,
+      scoringMode: 'MODE_A', // 'MODE_A' (Percentage) | 'MODE_B' (Direct Points)
+      pgWeightPercent: 60,
+      essayWeightPercent: 40,
+      modeBPgPoint: 2,
+      modeBEssayMaxPoint: 10,
+      rounding: 'EXACT_1',
+
+      // Unscanned Students Queue (Simulated upcoming LJK sheets in teacher's stack)
+      unscannedStudents: [
+        { id: 'S01', name: 'Ahmad Fauzan', handwritingPreview: 'Ahmad Fauzan', pgCorrectBase: 21, essayScores: [4.0, 3.5, 5.0, 2.5, 3.5] },
+        { id: 'S02', name: 'Nadia Putri Rahma', handwritingPreview: 'Nadia Putri R.', handwriting: true, pgCorrectBase: 23, essayScores: [4.5, 4.0, 5.0, 3.5, 4.0] },
+        { id: 'S03', name: 'Dimas Pratama', handwritingPreview: 'Dimas Pratama', pgCorrectBase: 18, essayScores: [3.0, 2.5, 4.0, 2.0, 3.0] },
+        { id: 'S04', name: 'Aulia Zahra', handwritingPreview: 'Aulia Zahra', pgCorrectBase: 24, essayScores: [5.0, 4.5, 4.5, 4.0, 5.0] },
+        { id: 'S05', name: 'Rizky Ramadhan', handwritingPreview: 'Rizky Ramadhan', pgCorrectBase: 19, essayScores: [3.5, 3.0, 3.5, 2.5, 3.0] },
+        { id: 'S06', name: 'Salsabila Khairunnisa', handwritingPreview: 'Salsabila K.', pgCorrectBase: 22, essayScores: [4.0, 4.0, 4.5, 3.0, 4.0] },
+      ],
+
+      // Already Scanned Gradebook (24 students simulated; displaying top/recent ones)
+      gradebook: [
+        { id: 'G01', name: 'Siti Nurhaliza', pgCorrect: 24, pgTotal: 25, essayScore: 23.0, essayTotal: 25, finalScore: 94.4, status: 'Lulus' },
+        { id: 'G02', name: 'Budi Santoso', pgCorrect: 21, pgTotal: 25, essayScore: 19.5, essayTotal: 25, finalScore: 81.6, status: 'Lulus' },
+        { id: 'G03', name: 'Citra Lestari', pgCorrect: 22, pgTotal: 25, essayScore: 20.0, essayTotal: 25, finalScore: 84.8, status: 'Lulus' },
+        { id: 'G04', name: 'Fajar Nugroho', pgCorrect: 16, pgTotal: 25, essayScore: 14.5, essayTotal: 25, finalScore: 61.6, status: 'Remedial' },
+        { id: 'G05', name: 'Intan Permata', pgCorrect: 20, pgTotal: 25, essayScore: 18.0, essayTotal: 25, finalScore: 76.8, status: 'Lulus' },
+        { id: 'G06', name: 'Hendra Wijaya', pgCorrect: 19, pgTotal: 25, essayScore: 17.5, essayTotal: 25, finalScore: 73.6, status: 'Remedial' },
+      ],
+      totalClassSize: 30,
+      scannedTotalCount: 24,
+
+      // Current Scan Session Data (Active inside Verification Modal)
+      currentScan: null,
+      activeEditingQuestion: null,
+    };
+
+    // 2. INITIALIZATION
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      updatePaperPreviewName();
+      renderGradebook();
+      updateCounters();
+    });
+
+    // 3. TAB NAVIGATION
+    function switchTab(tabName) {
+      state.activeTab = tabName;
+
+      // Hide all sections
+      document.getElementById('view-setup').classList.add('hidden');
+      document.getElementById('view-scan').classList.add('hidden');
+      document.getElementById('view-grades').classList.add('hidden');
+
+      // Reset nav colors
+      ['setup', 'scan', 'grades'].forEach(t => {
+        const navBtn = document.getElementById(`nav-${t}`);
+        navBtn.classList.remove('text-brand-700');
+        navBtn.classList.add('text-slate-400');
+        navBtn.querySelector('span').classList.remove('font-bold');
+        navBtn.querySelector('span').classList.add('font-semibold');
+      });
+
+      // Show selected section & highlight nav
+      document.getElementById(`view-${tabName}`).classList.remove('hidden');
+      const activeNav = document.getElementById(`nav-${tabName}`);
+      activeNav.classList.remove('text-slate-400');
+      activeNav.classList.add('text-brand-700');
+      activeNav.querySelector('span').classList.remove('font-semibold');
+      activeNav.querySelector('span').classList.add('font-bold');
+
+      if (tabName === 'grades') {
+        renderGradebook();
+      }
+    }
+
+    // 4. TAB 1: EXAM CONFIGURATION & SCORING RULES
+    function adjustQuestionCount(type, delta) {
+      if (type === 'pg') {
+        state.pgCount = Math.min(50, Math.max(5, state.pgCount + delta));
+        document.getElementById('display-pg-count').textContent = state.pgCount;
+      } else {
+        state.essayCount = Math.min(10, Math.max(0, state.essayCount + delta));
+        document.getElementById('display-essay-count').textContent = state.essayCount;
+      }
+      updateExamConfig();
+    }
+
+    function setScoringMode(mode) {
+      state.scoringMode = mode;
+      const btnA = document.getElementById('btn-mode-a');
+      const btnB = document.getElementById('btn-mode-b');
+      const panelA = document.getElementById('panel-mode-a');
+      const panelB = document.getElementById('panel-mode-b');
+
+      if (mode === 'MODE_A') {
+        btnA.className = 'py-2 px-2.5 rounded-lg text-xs font-bold bg-white text-brand-800 shadow-sm transition';
+        btnB.className = 'py-2 px-2.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-700 transition';
+        panelA.classList.remove('hidden');
+        panelB.classList.add('hidden');
+      } else {
+        btnB.className = 'py-2 px-2.5 rounded-lg text-xs font-bold bg-white text-brand-800 shadow-sm transition';
+        btnA.className = 'py-2 px-2.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-700 transition';
+        panelB.classList.remove('hidden');
+        panelA.classList.add('hidden');
+      }
+      updateExamConfig();
+    }
+
+    function updateWeightSlider(val) {
+      state.pgWeightPercent = parseInt(val, 10);
+      state.essayWeightPercent = 100 - state.pgWeightPercent;
+      document.getElementById('label-pg-weight').textContent = state.pgWeightPercent;
+      document.getElementById('label-essay-weight').textContent = state.essayWeightPercent;
+    }
+
+    function updateExamConfig() {
+      const titleInput = document.getElementById('input-exam-title').value.trim();
+      state.examTitle = titleInput || 'Ujian Tanpa Judul';
+      document.getElementById('header-exam-title').textContent = state.examTitle;
+
+      state.modeBPgPoint = parseFloat(document.getElementById('input-pg-point').value) || 2;
+      state.modeBEssayMaxPoint = parseFloat(document.getElementById('input-essay-point').value) || 10;
+      state.rounding = document.getElementById('select-rounding').value;
+
+      const maxModeB = (state.pgCount * state.modeBPgPoint) + (state.essayCount * state.modeBEssayMaxPoint);
+      document.getElementById('mode-b-max-score').textContent = `${maxModeB} Poin`;
+    }
+
+    // LJK A4 Blueprint Preview Modal
+    function openLjkPreviewModal() {
+      document.getElementById('preview-sheet-title').textContent = state.examTitle;
+      document.getElementById('preview-pg-count').textContent = state.pgCount;
+      document.getElementById('preview-essay-count').textContent = state.essayCount;
+
+      // Render sample rows of PG (up to 16 preview rows representing 2 columns)
+      const pgGrid = document.getElementById('preview-pg-grid');
+      pgGrid.innerHTML = '';
+      const sampleRows = Math.min(state.pgCount, 14);
+      for (let i = 1; i <= sampleRows; i++) {
+        pgGrid.innerHTML += `
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500 w-4">${String(i).padStart(2, '0')}</span>
+            <div class="flex gap-1">
+              <span class="w-3 h-3 rounded-full border border-slate-500 flex items-center justify-center text-[6px]">A</span>
+              <span class="w-3 h-3 rounded-full border border-slate-500 flex items-center justify-center text-[6px]">B</span>
+              <span class="w-3 h-3 rounded-full border border-slate-500 flex items-center justify-center text-[6px]">C</span>
+              <span class="w-3 h-3 rounded-full border border-slate-500 flex items-center justify-center text-[6px]">D</span>
+            </div>
+          </div>
+        `;
+      }
+
+      // Render Essay rows (0-5 + +.5)
+      const essaySection = document.getElementById('preview-essay-section');
+      const essayGrid = document.getElementById('preview-essay-grid');
+      if (state.essayCount === 0) {
+        essaySection.classList.add('hidden');
+      } else {
+        essaySection.classList.remove('hidden');
+        essayGrid.innerHTML = '';
+        for (let e = 1; e <= state.essayCount; e++) {
+          essayGrid.innerHTML += `
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-700">E${e}</span>
+              <div class="flex items-center gap-1">
+                ${[0,1,2,3,4,5].map(n => `<span class="w-3 h-3 rounded-full border border-slate-500 flex items-center justify-center text-[6px]">${n}</span>`).join('')}
+                <span class="ml-1 px-1 py-0.2 rounded border border-brand-700 text-brand-800 font-bold text-[6px]">+.5</span>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      document.getElementById('ljk-preview-modal').classList.remove('hidden');
+    }
+
+    function closeLjkPreviewModal() {
+      document.getElementById('ljk-preview-modal').classList.add('hidden');
+    }
+
+    // 5. TAB 2: CAMERA VIEWFINDER & AUTO-CAPTURE SIMULATION
+    function updatePaperPreviewName() {
+      const nextStudent = state.unscannedStudents[0];
+      const previewEl = document.getElementById('paper-handwriting-preview');
+      if (nextStudent) {
+        previewEl.textContent = nextStudent.handwritingPreview;
+      } else {
+        previewEl.textContent = 'Semua Siswa Selesai!';
+      }
+    }
+
+    function toggleTorch() {
+      state.torchOn = !state.torchOn;
+      const btn = document.getElementById('btn-torch');
+      const overlay = document.getElementById('torch-overlay');
+      if (state.torchOn) {
+        btn.classList.add('bg-amber-400', 'text-slate-950', 'border-amber-300');
+        btn.classList.remove('bg-black/60', 'text-white/80');
+        overlay.classList.remove('hidden');
+        showToast('Lampu Flash kamera dinyalakan');
+      } else {
+        btn.classList.remove('bg-amber-400', 'text-slate-950', 'border-amber-300');
+        btn.classList.add('bg-black/60', 'text-white/80');
+        overlay.classList.add('hidden');
+      }
+    }
+
+    async function toggleCameraSource() {
+      const videoEl = document.getElementById('real-camera-video');
+      const simPaper = document.getElementById('simulated-paper-bg');
+      const label = document.getElementById('cam-source-label');
+
+      if (!state.usingRealCamera) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+          });
+          state.mediaStream = stream;
+          videoEl.srcObject = stream;
+          videoEl.classList.remove('hidden');
+          simPaper.classList.add('opacity-20');
+          state.usingRealCamera = true;
+          label.textContent = 'Kamera Asli';
+          showToast('Kamera perangkat aktif');
+        } catch (err) {
+          showToast('Izin kamera tidak tersedia, tetap di mode Demo LJK');
+        }
+      } else {
+        if (state.mediaStream) {
+          state.mediaStream.getTracks().forEach(track => track.stop());
+        }
+        videoEl.classList.add('hidden');
+        simPaper.classList.remove('opacity-20');
+        state.usingRealCamera = false;
+        label.textContent = 'Demo LJK';
+      }
+    }
+
+    function toggleOfflineDemo() {
+      state.isOffline = !state.isOffline;
+      const dot = document.getElementById('sync-dot');
+      const text = document.getElementById('sync-text');
+
+      if (state.isOffline) {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        text.textContent = `Offline (${state.offlineQueueCount} Antrean)`;
+        showToast('Simulasi Mode Offline: Scan disimpan lokal di HP');
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        if (state.offlineQueueCount > 0) {
+          showToast(`${state.offlineQueueCount} hasil scan tersinkron ke server!`);
+          state.offlineQueueCount = 0;
+        } else {
+          showToast('Koneksi Online kembali');
+        }
+        text.textContent = 'Online';
+      }
+    }
+
+    function triggerAutoCapture() {
+      if (state.unscannedStudents.length === 0) {
+        showToast('Seluruh 30 siswa di kelas 8A sudah selesai dipindai!');
+        switchTab('grades');
+        return;
+      }
+
+      // Haptic feedback if supported on mobile
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+
+      // Prepare current scan payload from top unscanned student
+      const targetStudent = state.unscannedStudents[0];
+      const activeEssays = targetStudent.essayScores.slice(0, state.essayCount);
+      while (activeEssays.length < state.essayCount) {
+        activeEssays.push(3.5);
+      }
+
+      // Scale base PG correct proportionally if user changed pgCount from 25
+      const scaledPgCorrect = Math.min(
+        state.pgCount - 2,
+        Math.round((targetStudent.pgCorrectBase / 25) * state.pgCount)
+      );
+
+      state.currentScan = {
+        matchedStudentId: targetStudent.id,
+        handwritingPreview: targetStudent.handwritingPreview,
+        pgCorrectBase: scaledPgCorrect,
+        essayScores: [...activeEssays],
+        flaggedQuestions: [
+          {
+            number: Math.min(14, state.pgCount),
+            issue: 'Arsiran Tipis',
+            confidence: '48%',
+            detected: 'B',
+            correctKey: 'B',
+            resolved: false,
+            selectedAnswer: null // null until resolved or kept
+          },
+          {
+            number: Math.min(21, state.pgCount),
+            issue: 'Ganda (A & C)',
+            confidence: 'Ganda',
+            detected: 'A,C',
+            correctKey: 'C',
+            resolved: false,
+            selectedAnswer: null
+          }
+        ]
+      };
+
+      // Deduplicate flagged numbers if pgCount is small
+      if (state.currentScan.flaggedQuestions[0].number === state.currentScan.flaggedQuestions[1].number) {
+        state.currentScan.flaggedQuestions.pop();
+      }
+
+      openVerificationModal();
+    }
+
+    // 6. QUICK VERIFICATION BOTTOM-SHEET LOGIC
+    function openVerificationModal() {
+      const scan = state.currentScan;
+      state.activeEditingQuestion = null;
+      document.getElementById('inline-bubble-editor').classList.add('hidden');
+
+      // Populate cropped handwriting & smart student dropdown
+      document.getElementById('crop-handwriting-name').textContent = scan.handwritingPreview;
+      document.getElementById('unscanned-count-label').textContent = state.unscannedStudents.length;
+
+      const dropdown = document.getElementById('student-select-dropdown');
+      dropdown.innerHTML = state.unscannedStudents.map(s => `
+        <option value="${s.id}" ${s.id === scan.matchedStudentId ? 'selected' : ''}>
+          ${s.name} (Belum Discan)
+        </option>
+      `).join('');
+
+      renderFlaggedChips();
+      renderEssayQuickEdit();
+      recalculateVerificationScores();
+
+      document.getElementById('verification-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeVerificationModal() {
+      document.getElementById('verification-modal').classList.add('hidden');
+    }
+
+    function renderFlaggedChips() {
+      const scan = state.currentScan;
+      const container = document.getElementById('flagged-chips-container');
+      const unresolvedCount = scan.flaggedQuestions.filter(q => !q.resolved).length;
+      document.getElementById('flagged-count').textContent = unresolvedCount;
+
+      container.innerHTML = scan.flaggedQuestions.map(q => {
+        if (q.resolved) {
+          return `
+            <button onclick="openBubbleEditor(${q.number})" class="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5 transition active:scale-95">
+              <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+              No. ${q.number} (${q.selectedAnswer || 'Kosong'})
+            </button>
+          `;
+        }
+        const isDouble = q.issue.includes('Ganda');
+        const chipColors = isDouble
+          ? 'bg-rose-50 border-rose-200 text-rose-800'
+          : 'bg-amber-50 border-amber-200 text-amber-800';
+        return `
+          <button onclick="openBubbleEditor(${q.number})" class="px-3 py-1.5 rounded-xl border ${chipColors} text-xs font-bold flex items-center gap-1.5 shadow-2xs transition active:scale-95">
+            <span>No. ${q.number} (${q.issue})</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+          </button>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function openBubbleEditor(qNumber) {
+      state.activeEditingQuestion = qNumber;
+      const qObj = state.currentScan.flaggedQuestions.find(q => q.number === qNumber);
+      if (!qObj) return;
+
+      const editor = document.getElementById('inline-bubble-editor');
+      editor.classList.remove('hidden');
+
+      document.getElementById('editor-question-label').textContent = `Koreksi Soal No. ${qObj.number}`;
+      document.getElementById('editor-issue-badge').textContent = qObj.resolved
+        ? `Diperbaiki: ${qObj.selectedAnswer || 'Kosong'}`
+        : `${qObj.issue}`;
+      document.getElementById('editor-key-hint').textContent = qObj.correctKey;
+
+      // Render zoomed visual of A B C D bubbles
+      const visual = document.getElementById('zoomed-bubble-visual');
+      visual.innerHTML = ['A', 'B', 'C', 'D'].map(opt => {
+        let bubbleStyle = 'border-2 border-slate-400 text-slate-500 bg-white';
+        if (qObj.resolved && qObj.selectedAnswer === opt) {
+          bubbleStyle = 'bg-brand-700 border-2 border-brand-800 text-white shadow-sm';
+        } else if (!qObj.resolved && qObj.detected.includes(opt)) {
+          bubbleStyle = qObj.issue.includes('Tipis')
+            ? 'bg-slate-400/70 border-2 border-amber-500 text-slate-900'
+            : 'bg-slate-800 border-2 border-rose-500 text-white';
+        }
+        return `<span class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-extrabold ${bubbleStyle}">${opt}</span>`;
+      }).join('');
+    }
+
+    function applyBubbleFix(choice) {
+      const qObj = state.currentScan.flaggedQuestions.find(q => q.number === state.activeEditingQuestion);
+      if (!qObj) return;
+
+      qObj.resolved = true;
+      qObj.selectedAnswer = choice;
+
+      openBubbleEditor(qObj.number);
+      renderFlaggedChips();
+      recalculateVerificationScores();
+    }
+
+    function renderEssayQuickEdit() {
+      const grid = document.getElementById('essay-scores-grid');
+      if (state.essayCount === 0) {
+        grid.innerHTML = `<p class="col-span-2 text-xs text-slate-400 italic">Tidak ada soal esai pada ujian ini.</p>`;
+        return;
+      }
+
+      grid.innerHTML = state.currentScan.essayScores.map((score, idx) => `
+        <div class="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-2">
+          <span class="text-xs font-extrabold text-slate-600">E${idx + 1}</span>
+          <div class="flex items-center gap-1.5">
+            <button onclick="adjustEssayScore(${idx}, -0.5)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center active:scale-90">-</button>
+            <span class="w-8 text-center text-xs font-extrabold text-brand-800">${score.toFixed(1)}</span>
+            <button onclick="adjustEssayScore(${idx}, 0.5)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center active:scale-90">+</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function adjustEssayScore(index, delta) {
+      const current = state.currentScan.essayScores[index];
+      const next = Math.min(5.0, Math.max(0.0, current + delta));
+      state.currentScan.essayScores[index] = next;
+      renderEssayQuickEdit();
+      recalculateVerificationScores();
+    }
+
+    function calculateFinalGrade(pgCorrect, pgTotal, essaySum, essayMax) {
+      let rawFinal = 0;
+
+      if (state.scoringMode === 'MODE_A') {
+        const pgNorm = pgTotal > 0 ? (pgCorrect / pgTotal) * state.pgWeightPercent : 0;
+        const essayNorm = essayMax > 0 ? (essaySum / essayMax) * state.essayWeightPercent : 0;
+        rawFinal = pgNorm + essayNorm;
+      } else {
+        // Mode B: Direct Points
+        const pgPoints = pgCorrect * state.modeBPgPoint;
+        const essayRatio = essayMax > 0 ? (essaySum / essayMax) : 0;
+        const essayPoints = essayRatio * (state.essayCount * state.modeBEssayMaxPoint);
+        rawFinal = pgPoints + essayPoints;
+      }
+
+      if (state.rounding === 'ROUND') return Math.round(rawFinal).toFixed(1);
+      if (state.rounding === 'CEIL') return Math.ceil(rawFinal).toFixed(1);
+      return rawFinal.toFixed(1);
+    }
+
+    function recalculateVerificationScores() {
+      const scan = state.currentScan;
+      let bonusFromFixes = 0;
+      scan.flaggedQuestions.forEach(q => {
+        if (q.resolved && q.selectedAnswer === q.correctKey) {
+          bonusFromFixes += 1;
+        }
+      });
+
+      const pgCorrect = Math.min(state.pgCount, scan.pgCorrectBase + bonusFromFixes);
+      const essaySum = scan.essayScores.reduce((acc, val) => acc + val, 0);
+      const essayMax = state.essayCount * 5;
+
+      const finalScore = calculateFinalGrade(pgCorrect, state.pgCount, essaySum, essayMax);
+
+      document.getElementById('verify-pg-summary').textContent = `${pgCorrect}/${state.pgCount}`;
+      document.getElementById('verify-essay-summary').textContent = `${essaySum.toFixed(1)}/${essayMax}`;
+      document.getElementById('verify-final-score').textContent = finalScore;
+
+      scan.computedPgCorrect = pgCorrect;
+      scan.computedEssaySum = essaySum;
+      scan.computedFinalScore = parseFloat(finalScore);
+    }
+
+    function saveAndNextScan() {
+      const selectedId = document.getElementById('student-select-dropdown').value;
+      const studentIndex = state.unscannedStudents.findIndex(s => s.id === selectedId);
+      const studentObj = studentIndex >= 0
+        ? state.unscannedStudents.splice(studentIndex, 1)[0]
+        : { id: selectedId, name: 'Siswa Terpilih' };
+
+      const scan = state.currentScan;
+      const finalVal = scan.computedFinalScore;
+
+      // Add to top of gradebook
+      state.gradebook.unshift({
+        id: studentObj.id,
+        name: studentObj.name,
+        pgCorrect: scan.computedPgCorrect,
+        pgTotal: state.pgCount,
+        essayScore: scan.computedEssaySum,
+        essayTotal: state.essayCount * 5,
+        finalScore: finalVal,
+        status: finalVal >= 75 ? 'Lulus' : 'Remedial'
+      });
+
+      state.scannedTotalCount += 1;
+      if (state.isOffline) {
+        state.offlineQueueCount += 1;
+        document.getElementById('sync-text').textContent = `Offline (${state.offlineQueueCount} Antrean)`;
+      }
+
+      updateCounters();
+      updatePaperPreviewName();
+      closeVerificationModal();
+
+      showToast(`Tersimpan: ${studentObj.name} (Nilai: ${finalVal.toFixed(1)})`);
+    }
+
+    // 7. TAB 3: GRADEBOOK RENDERING & EXPORT
+    function updateCounters() {
+      const remaining = state.totalClassSize - state.scannedTotalCount;
+      document.getElementById('scan-counter-badge').textContent = `${state.scannedTotalCount}/${state.totalClassSize}`;
+      document.getElementById('stat-scanned').textContent = `${state.scannedTotalCount}/${state.totalClassSize}`;
+      document.getElementById('stat-remaining').textContent = remaining > 0 ? `Sisa ${remaining} lembar` : 'Semua selesai!';
+
+      // Compute avg & max from displayed gradebook
+      const scores = state.gradebook.map(g => g.finalScore);
+      const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+      const max = Math.max(...scores).toFixed(1);
+      document.getElementById('stat-avg').textContent = avg;
+      document.getElementById('stat-max').textContent = max;
+    }
+
+    function renderGradebook() {
+      const query = (document.getElementById('grade-search-input')?.value || '').toLowerCase();
+      const listEl = document.getElementById('gradebook-list');
+
+      const filtered = state.gradebook.filter(item => item.name.toLowerCase().includes(query));
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div class="text-center py-8 text-xs text-slate-400">Nama siswa tidak ditemukan.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(item => {
+        const isPass = item.finalScore >= 75;
+        const badgeStyle = isPass
+          ? 'bg-brand-50 text-brand-800 border-brand-200'
+          : 'bg-rose-50 text-rose-700 border-rose-200';
+        return `
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <h4 class="font-bold text-sm text-slate-800">${item.name}</h4>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded border ${badgeStyle}">${item.status}</span>
+              </div>
+              <p class="text-[11px] text-slate-500 font-medium">
+                PG: <strong class="text-slate-700">${item.pgCorrect}/${item.pgTotal}</strong> •
+                Esai: <strong class="text-slate-700">${item.essayScore.toFixed(1)}/${item.essayTotal}</strong>
+              </p>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] uppercase font-bold text-slate-400 block">Nilai</span>
+              <span class="text-lg font-extrabold ${isPass ? 'text-brand-800' : 'text-rose-600'}">${item.finalScore.toFixed(1)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function exportMockCSV() {
+      showToast(`Mengunduh Rekap_${state.examTitle.replace(/\s+/g, '_')}.csv`);
+    }
+
+    // 8. TOAST HELPER
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast-notification');
+      document.getElementById('toast-message').textContent = msg;
+      toast.classList.remove('hidden');
+
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 2800);
+    }
+  </script>
+</body>
+</html>

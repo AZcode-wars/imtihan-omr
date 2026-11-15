@@ -1,0 +1,283 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================================
+   OpenOMR Design System — tokens
+   Sumber kebenaran: docs/design_tokens.md  &  docs/tailwind_mapping.md
+   PENTING: nilai di bawah ini adalah hasil Mapping Langsung dari dokumen.
+   Kalau ada yang berbeda di docs/design_tokens.md, dokumen itu yang benar —
+   dan file ini harus diperbarui, bukan sebaliknya.
+   ========================================================================== */
+
+@theme inline {
+  /* ---- shadcn/ui semantic ---- */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ---- Brand (aksen hijau) ---- */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  /* ---- Netral (slate) — sama dengan default Tailwind, ditulis agar eksplisit ---- */
+  --color-slate-50: var(--slate-50);
+  --color-slate-100: var(--slate-100);
+  --color-slate-200: var(--slate-200);
+  --color-slate-300: var(--slate-300);
+  --color-slate-400: var(--slate-400);
+  --color-slate-500: var(--slate-500);
+  --color-slate-600: var(--slate-600);
+  --color-slate-700: var(--slate-700);
+  --color-slate-800: var(--slate-800);
+  --color-slate-900: var(--slate-900);
+  --color-slate-950: var(--slate-950);
+
+  /* ---- Status OMR (4 state) ---- */
+  --color-status-valid-bg: var(--status-valid-bg);
+  --color-status-valid-border: var(--status-valid-border);
+  --color-status-valid-text: var(--status-valid-text);
+  --color-status-empty-bg: var(--status-empty-bg);
+  --color-status-empty-border: var(--status-empty-border);
+  --color-status-empty-text: var(--status-empty-text);
+  --color-status-low-bg: var(--status-low-bg);
+  --color-status-low-border: var(--status-low-border);
+  --color-status-low-text: var(--status-low-text);
+  --color-status-multiple-bg: var(--status-multiple-bg);
+  --color-status-multiple-border: var(--status-multiple-border);
+  --color-status-multiple-text: var(--status-multiple-text);
+
+  /* ---- Font ---- */
+  --font-sans: var(--font-roboto);
+  --font-hand: var(--font-caveat);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Skala radius, ukuran, shadow, dan motion — nilai tetap (tidak perlu mode). */
+@theme {
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 24px;
+  --radius-3xl: 999px;
+  --radius-4xl: 999px;
+
+  --text-display: 32px;
+  --text-display--line-height: 38px;
+  --text-display--letter-spacing: -0.02em;
+  --text-h1: 24px;
+  --text-h1--line-height: 32px;
+  --text-h1--letter-spacing: -0.01em;
+  --text-h2: 18px;
+  --text-h2--line-height: 26px;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h3: 16px;
+  --text-h3--line-height: 24px;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-body-strong: 15px;
+  --text-body-strong--line-height: 22px;
+  --text-body-strong--font-weight: 500;
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  --text-label--font-weight: 500;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-overline: 11px;
+  --text-overline--line-height: 14px;
+  --text-overline--font-weight: 700;
+  --text-overline--letter-spacing: 0.06em;
+  --text-score-lg: 28px;
+  --text-score-lg--line-height: 32px;
+  --text-score-lg--font-weight: 700;
+  --text-score-md: 20px;
+  --text-score-md--line-height: 24px;
+  --text-score-md--font-weight: 700;
+  --text-score-sm: 15px;
+  --text-score-sm--line-height: 20px;
+  --text-score-sm--font-weight: 700;
+
+  --shadow-xs: 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04);
+  --shadow-raised: 0 1px 3px rgb(15 23 42 / 0.08);
+  --shadow-floating: 0 8px 24px -12px rgb(15 23 42 / 0.18);
+  --shadow-sheet: 0 -8px 32px -12px rgb(15 23 42 / 0.16);
+
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  --animate-slide-up: slide-up 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Nilai ditulis sebagai HEX (bukan hsl()) supaya identik persis dengan
+   docs/design_tokens.md. Tailwind v4 mengonversi hsl() -> hex dengan
+   pembulatan yang bisa bergeser 1/255 (hsl(92 62% 22%) -> #365b15, bukan
+   #355A15). Hex eliminates drift itu. */
+:root {
+  /* ---- Brand (aksen hijau) — brand/700 = #355A15 ---- */
+  --brand-50: #f3f7ef;
+  --brand-100: #e3edd9;
+  --brand-200: #c7dcb5;
+  --brand-300: #a2c487;
+  --brand-400: #7da95d;
+  --brand-500: #5d8b3e;
+  --brand-600: #476e2e;
+  --brand-700: #355a15;
+  --brand-800: #24400e;
+  --brand-900: #1c330c;
+
+  /* ---- Netral (slate) ---- */
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --slate-950: #020617;
+
+  /* ---- Status OMR ----
+     PENTING: EMPTY (tidak diisi) sengaja TIDAK merah — ia kondisi netral.
+     EMPTY vs LOW_CONFIDENCE dibedakan oleh ikon + latar + border (dashed)
+     + angka confidence. Lihat docs/design_tokens.md §3.4. */
+  --status-valid-bg: #f3f7ef;
+  --status-valid-border: #c7dcb5;
+  --status-valid-text: #24400e;
+
+  --status-empty-bg: #fffbeb;
+  --status-empty-border: #fcd34d;
+  --status-empty-text: #92400e;
+
+  --status-low-bg: #fef3c7;
+  --status-low-border: #f59e0b;
+  --status-low-text: #78350f;
+
+  --status-multiple-bg: #fff1f2;
+  --status-multiple-border: #fecdd3;
+  --status-multiple-text: #9f1239;
+
+  /* ---- shadcn/ui semantic ---- */
+  --background: var(--slate-50);
+  --foreground: var(--slate-900);
+  --card: #ffffff;
+  --card-foreground: var(--slate-900);
+  --popover: #ffffff;
+  --popover-foreground: var(--slate-900);
+  --primary: var(--brand-700);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-100);
+  --secondary-foreground: var(--brand-800);
+  --muted: var(--slate-100);
+  --muted-foreground: var(--slate-500);
+  --accent: var(--brand-50);
+  --accent-foreground: var(--brand-800);
+  --destructive: #e11d48;
+  --destructive-foreground: #ffffff;
+  --border: var(--slate-200);
+  --input: var(--slate-200);
+  --ring: var(--brand-700);
+
+  --chart-1: var(--brand-700);
+  --chart-2: var(--brand-500);
+  --chart-3: var(--brand-300);
+  --chart-4: var(--slate-500);
+  --chart-5: var(--slate-300);
+
+  --radius: 12px;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: var(--slate-900);
+  --sidebar-primary: var(--brand-700);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--brand-50);
+  --sidebar-accent-foreground: var(--brand-800);
+  --sidebar-border: var(--slate-200);
+  --sidebar-ring: var(--brand-700);
+}
+
+/* Dark mode BELUM diimplementasikan (lihat plans: deferred).
+   Infrastruktur variabelnya sudah siap — cukup isi blok ini
+   dan tambahkan kelas `dark` ke <html> bilaNeeded. */
+
+/* Utility kustom yang tidak punya kelas bawaan Tailwind. */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility duration-fast {
+  transition-duration: 120ms;
+}
+
+@utility duration-base {
+  transition-duration: 200ms;
+}
+
+@utility duration-slow {
+  transition-duration: 280ms;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
