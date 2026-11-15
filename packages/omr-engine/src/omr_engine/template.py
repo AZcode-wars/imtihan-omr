@@ -37,25 +37,44 @@ from openomr_schemas import ExamTemplate
 
 PAGE_WIDTH_MM = 210.0
 PAGE_HEIGHT_MM = 297.0
-MARGIN_MM = 10.0
+MARGIN_MM = 8.0
 
+#: Jarak antar pusat antar bubble. PRD FR-1.2: minimal 6 mm (dulu 8,5 mm).
+#: Dengan 6 mm, 25 soal PG hanya butuh 78 mm (bukan 110 mm) sehingga zona
+#: esai dapat jauh lebih lega. Celah antar sisi bubble = 6 - 4,5 = 1,5 mm;
+#: keandalan pembacaan pada celah ini diverifikasi di Task 4 (kasus pensil
+#: redis & pencahayaan redup).
 BUBBLE_DIAMETER_MM = 4.5
-BUBBLE_PITCH_MM = 8.5
+BUBBLE_PITCH_MM = 6.0
 
 FIDUCIAL_TL_MM = 14.0
 FIDUCIAL_OTHER_MM = 10.0
 
 COLUMN_COUNT = 2
-COLUMN_X_MM = (14.0, 108.0)
+COLUMN_X_MM = (14.0, 62.0)
 
 OPTION_LABELS = ("A", "B", "C", "D")
-MC_OPTION_OFFSET_MM = 12.0  # jarak dari x kolom ke pusat option pertama
+MC_OPTION_OFFSET_MM = 9.0  # jarak dari x kolom ke pusat option pertama
 
 CONTENT_TOP_MM = 30.0
+#: Judul utama "LEMBAR JAWABAN KOMPUTER". X-nya di KANAN fiducial kiri-atas
+#: (yang berakhir di 22 mm), supaya tidak pernah bertumpuk.
+PAPER_TITLE_X_MM = 25.0
+PAPER_TITLE_Y_MM = 27.0
+#: Judul seksi "I. PILIHAN GANDA".
+MC_SECTION_TITLE_Y_MM = 46.0
 NAME_CROP_RECT_MM = {"x": 14.0, "y": 30.0, "w": 90.0, "h": 12.0}
 CLASS_BOX_RECT_MM = {"x": 110.0, "y": 30.0, "w": 80.0, "h": 12.0}
 
-TITLE_Y_MM = 46.0
+#: Kotak petunjuk pengisian — mengisi ruang kosong di kanan zona PG.
+INSTRUCTION_BOX_RECT_MM = {"x": 100.0, "y": 52.0, "w": 90.0, "h": 40.0}
+INSTRUCTIONS = (
+    "Isilah dengan pensil 2B",
+    "Jangan memakai bolpoin",
+    "Coret jawaban yang salah",
+    "Tulis nama dan kelas dengan jelas",
+)
+
 MC_START_Y_MM = 52.0
 
 ESSAY_START_PREFERRED_MM = 164.0
@@ -76,9 +95,9 @@ ESSAY_GAP_MM = 8.0
 #: Jarak minimum antara dua blok esai, di luar tinggi kotak jawaban.
 ESSAY_BLOCK_GAP_MM = 4.0
 
-#: Batas bawah isi konten. Fiducial bawah menempati pita y 277-287 mm,
-#: jadi konten harus berhenti 5 mm di atas pita itu (272 mm).
-CONTENT_BOTTOM_MM = PAGE_HEIGHT_MM - MARGIN_MM - 15.0  # 272 mm
+#: Batas bawah isi konten. Fiducial bawah menempati pita y 279-289 mm
+#: (margin 8 mm), jadi konten harus berhenti 5 mm di atas pita itu.
+CONTENT_BOTTOM_MM = PAGE_HEIGHT_MM - MARGIN_MM - 15.0  # 274 mm
 
 
 class TemplateOverflowError(ValueError):

@@ -28,7 +28,16 @@ import cv2
 import numpy as np
 
 from .pdf import render_pdf
-from .template import CLASS_BOX_RECT_MM, build_template, compute_layout
+from .template import (
+    CLASS_BOX_RECT_MM,
+    INSTRUCTION_BOX_RECT_MM,
+    INSTRUCTIONS,
+    MC_SECTION_TITLE_Y_MM,
+    PAPER_TITLE_X_MM,
+    PAPER_TITLE_Y_MM,
+    build_template,
+    compute_layout,
+)
 
 DEFAULT_PX_PER_MM = 4.0
 FILL_VALID = 0.55
@@ -188,7 +197,7 @@ def render_synthetic(
     cv2.putText(
         img,
         "LEMBAR JAWABAN KOMPUTER",
-        (_px(14, px_per_mm), _px(27, px_per_mm)),
+        (_px(PAPER_TITLE_X_MM, px_per_mm), _px(PAPER_TITLE_Y_MM, px_per_mm)),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.45,
         ink,
@@ -256,11 +265,31 @@ def render_synthetic(
         cv2.LINE_AA,
     )
 
+    # --- Petunjuk pengisian (ruang kosong di kanan zona PG) ---
+    guide = INSTRUCTION_BOX_RECT_MM
+    gx, gy = _px(guide["x"], px_per_mm), _px(guide["y"], px_per_mm)
+    gw, gh = _px(guide["w"], px_per_mm), _px(guide["h"], px_per_mm)
+    _dashed_rect(img, gx, gy, gw, gh, faint)
+    cv2.putText(
+        img, "PETUNJUK", (gx + 4, gy + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.32, faint, 1, cv2.LINE_AA
+    )
+    for i, line in enumerate(INSTRUCTIONS):
+        cv2.putText(
+            img,
+            f"- {line}",
+            (gx + 4, gy + 30 + i * 22),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.3,
+            faint,
+            1,
+            cv2.LINE_AA,
+        )
+
     # --- Pilihan Ganda ---
     cv2.putText(
         img,
         "I. PILIHAN GANDA",
-        (_px(14, px_per_mm), _px(46, px_per_mm)),
+        (_px(14, px_per_mm), _px(MC_SECTION_TITLE_Y_MM, px_per_mm)),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.4,
         ink,

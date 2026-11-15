@@ -12,12 +12,16 @@ from openomr_schemas import ExamTemplate, load_exam_template_schema
 from omr_engine.template import (
     BUBBLE_DIAMETER_MM,
     BUBBLE_PITCH_MM,
+    COLUMN_X_MM,
     CONTENT_BOTTOM_MM,
     FIDUCIAL_OTHER_MM,
     FIDUCIAL_TL_MM,
+    INSTRUCTION_BOX_RECT_MM,
     MARGIN_MM,
+    MC_OPTION_OFFSET_MM,
     PAGE_HEIGHT_MM,
     PAGE_WIDTH_MM,
+    PAPER_TITLE_X_MM,
     TemplateOverflowError,
     build_template,
     build_validated_template,
@@ -65,8 +69,8 @@ def test_semua_bubble_dalam_batas_kertas(pg: int, essay: int) -> None:
 
 
 @pytest.mark.parametrize(("pg", "essay"), [(25, 5), (30, 5), (20, 5)])
-def test_jarak_antar_pusat_minimal_8_5_mm(pg: int, essay: int) -> None:
-    """PRD FR-1.2: jarak antar pusat antar bubble minimal 8,5 mm."""
+def test_jarak_antar_pusat_minimal_6_mm(pg: int, essay: int) -> None:
+    """PRD FR-1.2: jarak antar pusat antar bubble minimal 6 mm."""
     template = build_template(pg_count=pg, essay_count=essay)
     centers = all_bubble_centers(template)
     for i, (x1, y1) in enumerate(centers):
@@ -191,14 +195,29 @@ def test_kombinasi_yang_tidak_muat_ditolak_dengan_pesan_bergerak() -> None:
 
 
 def test_batas_praktis_tercatat() -> None:
-    """30 PG + 5 esai masih muat; 32 PG + 5 esai sudah tidak.
+    """44 PG + 5 esai masih muat; 46 PG + 5 esai sudah tidak.
 
-    Batas ini dibatasi jarak antar pusat 8,5 mm (PRD FR-1.2) — bukan pilihan
+    Batas ini dibatasi jarak antar pusat 6 mm (PRD FR-1.2) — bukan pilihan
     desain. Antarmuka /setup harus memberi tahu guru sebelum mencetak.
     """
-    assert compute_layout(30, 5).content_bottom_y <= CONTENT_BOTTOM_MM
+    assert compute_layout(44, 5).content_bottom_y <= CONTENT_BOTTOM_MM
     with pytest.raises(TemplateOverflowError):
-        build_template(pg_count=32, essay_count=5)
+        build_template(pg_count=46, essay_count=5)
+
+
+def test_judul_utama_tidak_menabrak_fiducial_kiri_atas() -> None:
+    """Judul "LEMBAR JAWABAN KOMPUTER" harus di kanan fiducial kiri-atas."""
+    tl_right = MARGIN_MM + FIDUCIAL_TL_MM
+    assert PAPER_TITLE_X_MM > tl_right, "judul menabrak fiducial kiri-atas"
+
+
+def test_kotak_petunjuk_di_kanan_zona_pilihan_ganda() -> None:
+    """Kotak petunjuk mengisi ruang kosong, tidak menabrak kolom PG."""
+    assert INSTRUCTION_BOX_RECT_MM["x"] > COLUMN_X_MM[1] + MC_OPTION_OFFSET_MM
+    assert (
+        INSTRUCTION_BOX_RECT_MM["x"]
+        > COLUMN_X_MM[1] + MC_OPTION_OFFSET_MM + 3 * BUBBLE_PITCH_MM + BUBBLE_DIAMETER_MM
+    )
 
 
 def test_kotak_jawaban_esai_tidak_saling_tumpang_tindih() -> None:
@@ -209,8 +228,11 @@ def test_kotak_jawaban_esai_tidak_saling_tumpang_tindih() -> None:
 
 
 def test_max_essay_count_memberi_petunjuk_untuk_ui() -> None:
-    assert max_essay_count_for(50) == 0
-    assert max_essay_count_for(25) >= 5
+    # 50 PG masih muat sampai 4 soal esai; lebih dari itu tidak.
+    assert max_essay_count_for(50) == 4
+    # 25 PG + 10 soal esai tidak muat: kotak jawaban minimum 14 mm (2 baris
+    # handwriting). 8 soal esai masih muat.
+    assert max_essay_count_for(25) == 8
     assert max_essay_count_for(10) >= 10
 
 

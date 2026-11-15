@@ -13,7 +13,15 @@ from reportlab.lib.colors import Color, black, white
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-from .template import CLASS_BOX_RECT_MM, NAME_CROP_RECT_MM
+from .template import (
+    CLASS_BOX_RECT_MM,
+    INSTRUCTION_BOX_RECT_MM,
+    INSTRUCTIONS,
+    MC_SECTION_TITLE_Y_MM,
+    NAME_CROP_RECT_MM,
+    PAPER_TITLE_X_MM,
+    PAPER_TITLE_Y_MM,
+)
 
 MM_TO_PT = 72.0 / 25.4
 
@@ -121,8 +129,8 @@ def render_pdf(template: dict, path: str | Path) -> Path:
         _rect(c, f["xMm"], f["yMm"], f["sizeMm"], f["sizeMm"])
 
     # --- judul + zona nama ---
-    _text(c, "LEMBAR JAWABAN KOMPUTER", 14, 27, size_pt=9)
-    _text(c, template.get("examId", ""), 196, 27, size_pt=7, color=FAINT, align="right")
+    _text(c, "LEMBAR JAWABAN KOMPUTER", PAPER_TITLE_X_MM, PAPER_TITLE_Y_MM, size_pt=9)
+    _text(c, template.get("examId", ""), 196, PAPER_TITLE_Y_MM, size_pt=7, color=FAINT, align="right")
 
     crop = template["nameCropRectMm"]
     _dashed_rect(c, crop["x"], crop["y"], crop["w"], crop["h"])
@@ -138,8 +146,15 @@ def render_pdf(template: dict, path: str | Path) -> Path:
     _text(c, "____________", klass["x"] + 30, klass["y"] + 3, size_pt=8)
     _text(c, "____________", klass["x"] + 30, klass["y"] + 8, size_pt=8)
 
+    # --- Petunjuk pengisian (mengisi ruang kosong di kanan zona PG) ---
+    guide = INSTRUCTION_BOX_RECT_MM
+    _dashed_rect(c, guide["x"], guide["y"], guide["w"], guide["h"])
+    _text(c, "PETUNJUK", guide["x"] + 3, guide["y"] + 5, size_pt=6, color=FAINT)
+    for i, line in enumerate(INSTRUCTIONS):
+        _text(c, f"- {line}", guide["x"] + 3, guide["y"] + 11 + i * 6, size_pt=6.5)
+
     # --- Pilihan Ganda ---
-    _text(c, "I. PILIHAN GANDA", 14, 46, size_pt=7.5)
+    _text(c, "I. PILIHAN GANDA", 14, MC_SECTION_TITLE_Y_MM, size_pt=7.5)
     bubble_d = template["bubbleDiameterMm"]
     for slot in template["multipleChoiceSlots"]:
         _text(c, f"{slot['questionNumber']:02d}", slot["xMm"], slot["yMm"] + 1, size_pt=6, color=FAINT)

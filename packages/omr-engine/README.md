@@ -59,16 +59,16 @@ Kapasitas satu halaman (hasil implementasi):
 | Soal esai | PG maksimum |
 |---|---|
 | 0 | 50 |
-| 1 | 48 |
-| 2 | 44 |
-| 3 | 40 |
-| 4 | 34 |
-| 5 | 30 |
-| 6 | 26 |
-| 7 | 22 |
-| 8 | 18 |
-| 9 | 14 |
-| 10 | 10 |
+| 1 | 50 |
+| 2 | 50 |
+| 3 | 50 |
+| 4 | 50 |
+| 5 | 44 |
+| 6 | 38 |
+| 7 | 32 |
+| 8 | 26 |
+| 9 | 20 |
+| 10 | 14 |
 
 `max_essay_count_for(pg_count)` memberi tahu antarmuka berapa soal esai
 maksimum yang masih muat — dipakai layar `/setup` untuk memperingatkan guru
