@@ -15,11 +15,29 @@
 
 ---
 
-## [ ] Task 1 — Fase 0: Fondasi repo
+## [x] Task 1 — Fase 0: Fondasi repo ✅
 **Lakukan:** `git init` + `.gitignore` + commit dokumen · `apps/web` via create-next-app · `packages/omr-engine` via uv · `packages/shared-schemas` · port token ke Tailwind (v4 → `@theme` di CSS) · `shadcn init` + `add` komponen · `next/font` Roboto + Caveat.
 
-- **Target:** `npm run dev` → shell Next.js tampil dengan token brand aktif; `uv run pytest` jalan; `npm run build` lolos strict; 1 commit bersih.
-- **Tinjau:** struktur folder, isi `globals.css` (apakah token brand/aksen muncul), daftar komponen shadcn terpasang, versi Tailwind yang terpakai, apakah repo git bersih (tidak ada filetak-kehendak).
+**Hasil:**
+- Next.js **16.4.6** + React 19.3.0 + Tailwind **v4.3.3** (CSS-first, tanpa `tailwind.config.ts`) + shadcn/ui 4.23.0 (style `radix-nova`, base `neutral`, icon `lucide`)
+- 20 komponen shadcn/ui terpasang di `apps/web/src/components/ui/`
+- **Token design system terpasang penuh** di `apps/web/src/app/globals.css` — brand 50–900, slate 50–950, 4 status OMR, radius, 12 token tipografi, 5 shadow, motion
+- **17/17 token terverifikasi byte-per-byte** sama dengan `docs/design_tokens.md` (dicek dari CSS output hasil build)
+- `Button` & `Badge` disesuaikan ke spesifikasi OpenOMR (varian `primary`/`secondary`/`ghost`/`danger`, ukuran sm 32 / md 44 / lg 52; badge `pass`/`remedial`)
+- `apps/web/src/app/page.tsx` = halaman **Design System Preview** untuk memverifikasi token secara visual
+- Engine Python: **3.13.5** · cv2 5.0.0 · numpy 2.5.4 · fastapi 0.163.0 · reportlab 5.1.0 · pydantic 2.14.3 · pytest 9.2.0 · ruff 0.17.5
+- `packages/shared-schemas` = kerangka (paket TS + paket Python)
+
+**Commit:** `02bceca feat(0): fondasi repo OpenOMR`
+
+- **Target:** ✅ `npm run build` lolos TypeScript strict · ✅ `npm run start` → HTTP 200 · ✅ 17/17 token identik · ✅ `uv run python` → semua import OK · ✅ 1 commit bersih (76 file)
+- **Tinjau:**
+  1. `cd apps/web && npm run dev` → buka `http://localhost:3000` → halaman **Design System Preview**. Bandingkan swatch brand dengan `prototype/previews/01-tokens.png` (harus sama persis, termasuk `#355A15`).
+  2. Tombol: **sm 32 / md 44 / lg 52** — cek tinggi visualnya benar-benar berbeda.
+  3. Chip status: `empty` (kuning solid) vs `low` (kuning **dashed**) — bedanya harus terlihat jelas.
+  4. Font:_body_ harus Roboto (bukan Geist), tulisan tangan "Ahmad Fauzan" di specimen tipografi harus Caveat.
+  5. `packages/omr-engine` — `uv run python -c "import cv2; print(cv2.__version__)"` harus jalan.
+  6. **Keputusan yang perlu kamu konfirmasi:** saya **tidak** menambahkan blok `.dark` (dark mode deferred). `globals.css` sengaja light-only.
 
 ## [ ] Task 2 — Fase 1: Kontrak & logika murni
 **Lakukan:** tipe TS `src/types/omr.ts` · **JSON Schema `ExamTemplate`** + validator · model pydantic setara · `src/lib/scoring.ts` (Mode A/B, 3 pembulatan, KKM, Lulus/Remedial) · `vitest` + test table-driven.
@@ -99,4 +117,5 @@
 
 | Task | Selesai | Commit | Catatan |
 |---|---|---|---|
+| 1 — Fondasi repo | ✅ | `02bceca` | Next 16.4.6 / Tailwind v4.3.3 / shadcn radix-nova / Python 3.13.5. 17/17 token identik. Modul Python bernama `omr_engine` (bukan `omr` — nama device cadangan Windows). |
 | | | | |
