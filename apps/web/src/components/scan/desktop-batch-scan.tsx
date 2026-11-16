@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { ExamConfig, OMRScanResponse, Student } from "@/types/omr";
+import { ExamConfig, GradedStudentRecord, OMRScanResponse, Student } from "@/types/omr";
 import { Button } from "@/components/ui/button";
-import { getActiveExam } from "@/lib/db";
+import { getActiveExam, saveGradeRecord } from "@/lib/db";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -447,12 +447,19 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                 const assignedStudent = students.find((s) => s.id === item.selectedStudentId);
 
                 return (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelectedIndex(idx)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedIndex(idx);
+                      }
+                    }}
                     className={cn(
-                      "w-full p-3 rounded-xl flex items-center justify-between text-left transition-all border",
+                      "w-full p-3 rounded-xl flex items-center justify-between text-left transition-all border cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-brand-700",
                       isSelected
                         ? "bg-brand-50/80 border-brand-600 shadow-xs border-l-4 border-l-brand-700"
                         : "bg-white border-slate-200/80 hover:bg-slate-50"
@@ -468,7 +475,11 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                           {assignedStudent ? assignedStudent.name : item.filename}
                         </p>
                         <p className="text-[10px] text-slate-400 truncate">
-                          {assignedStudent ? `${assignedStudent.nis} · 8A` : item.filename}
+                          {assignedStudent
+                            ? `${assignedStudent.nis} · 8A`
+                            : item.file
+                            ? `${(item.file.size / 1024).toFixed(0)} KB · Belum ada siswa`
+                            : "Belum dicocokkan siswa"}
                         </p>
                       </div>
                     </div>
@@ -494,13 +505,13 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                       <button
                         type="button"
                         onClick={(e) => handleDeleteItem(item.id, e)}
-                        className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-1"
+                        className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-1 cursor-pointer"
                         title="Hapus lembar ini dari antrean"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -508,17 +519,37 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
 
           {/* Panel Kanan: Inspeksi LJK & Hasil Pindai (8 cols) */}
           <div className="col-span-12 lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-xs p-6 flex flex-col h-[750px] overflow-y-auto">
-            {selectedItem ? (
+            {selectedItem ? (() => {
+              const isItemProcessed = selectedItem.status === "DONE" && Boolean(selectedItem.scanResult);
+              return (
               <div className="space-y-6">
                 {/* Header Inspeksi */}
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                   <div>
-                    <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                      <span>Inspeksi Lembar #{String(selectedIndex + 1).padStart(2, "0")}</span>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-bold text-slate-800">
+                        Inspeksi Lembar #{String(selectedIndex + 1).padStart(2, "0")}
+                      </h2>
                       <span className="text-xs font-normal text-slate-400">
                         ({selectedItem.filename})
                       </span>
-                    </h2>
+                      {isItemProcessed ? (
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>Sudah Diproses</span>
+                        </span>
+                      ) : selectedItem.status === "PROCESSING" ? (
+                        <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+                          <span>Sedang Diproses</span>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-amber-600" />
+                          <span>Belum Diproses</span>
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Cocokkan potongan nama dan periksa tanda ragu pada jawaban siswa.
                     </p>
@@ -592,140 +623,232 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                       </select>
                     </div>
 
-                    {/* Ringkasan Skor Live */}
-                    <div className="p-4 rounded-xl bg-gradient-to-br from-brand-50 to-emerald-50/40 border border-brand-200">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="text-xs font-bold text-brand-900 uppercase tracking-wider block">
-                            NILAI AKHIR
-                          </span>
-                          <span className="text-[11px] text-brand-700 font-medium">
-                            {calculateScore(selectedItem.scanResult).correctCount} Benar dari {calculateScore(selectedItem.scanResult).totalCount} Soal
+                    {!isItemProcessed ? (
+                      /* Banner jika foto belum diproses */
+                      <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-900 space-y-3">
+                        <div className="flex items-center gap-2">
+                          {selectedItem.status === "PROCESSING" ? (
+                            <Loader2 className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
+                          ) : (
+                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          )}
+                          <span className="text-xs font-bold uppercase tracking-wider">
+                            {selectedItem.status === "PROCESSING"
+                              ? "Sedang Memindai Citra LJK..."
+                              : selectedItem.status === "ERROR"
+                              ? "Gagal Memproses LJK"
+                              : "Hasil Nilai Belum Tersedia"}
                           </span>
                         </div>
-                        <span className="text-3xl font-bold font-mono text-brand-800">
-                          {calculateScore(selectedItem.scanResult).grade}
-                        </span>
+                        <p className="text-xs text-amber-800 leading-relaxed">
+                          {selectedItem.status === "PROCESSING"
+                            ? "Engine OMR sedang membaca bulatan lembar ini. Mohon tunggu sejenak..."
+                            : selectedItem.status === "ERROR"
+                            ? (selectedItem.error || "Citra LJK tidak terbaca dengan baik. Pastikan 4 sudut fiducial terlihat.")
+                            : "Foto lembar ini belum dipindai oleh engine OMR. Tombol simpan dinonaktifkan sampai lembar selesai diproses."}
+                        </p>
+                        {selectedItem.status !== "PROCESSING" && (
+                          <Button
+                            size="sm"
+                            disabled={isProcessingAll}
+                            onClick={handleProcessBatch}
+                            className="bg-amber-700 hover:bg-amber-800 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Proses Semua Antrean Sekarang</span>
+                          </Button>
+                        )}
                       </div>
-                      <div className="mt-2 pt-2 border-t border-brand-200/60 flex items-center justify-between text-[11px] text-brand-800">
-                        <span>Status Pengisian LJK:</span>
-                        <span className="font-semibold">
-                          {calculateScore(selectedItem.scanResult).validCount} / {calculateScore(selectedItem.scanResult).totalCount} Terisi Valid
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Rincian Jawaban Siswa vs Kunci */}
-                    <div>
-                      <span className="text-xs font-bold text-slate-700 block mb-2">
-                        Pemeriksaan Jawaban ({calculateScore(selectedItem.scanResult).totalCount} Soal)
-                      </span>
-                      <div className="grid grid-cols-5 gap-1.5 mb-3">
-                        {selectedItem.scanResult?.mcAnswers.map((ans) => {
-                          const configItem = examConfig?.multipleChoiceQuestions?.find(
-                            (q) => q.number === ans.questionNumber
-                          );
-                          const correctKey = configItem?.correctAnswer || "A";
-                          const isCorrect = ans.status === "VALID" && ans.selectedOption === correctKey;
-                          const isWrong = ans.status === "VALID" && ans.selectedOption !== correctKey;
-
-                          return (
-                            <div
-                              key={ans.questionNumber}
-                              className={cn(
-                                "p-2 rounded-lg border text-center text-xs flex flex-col items-center justify-center transition-all",
-                                isCorrect
-                                  ? "bg-emerald-50 border-emerald-300 text-emerald-900"
-                                  : isWrong
-                                  ? "bg-rose-50 border-rose-300 text-rose-900"
-                                  : "bg-amber-50 border-amber-300 text-amber-900"
-                              )}
-                            >
-                              <span className="text-[10px] font-bold text-slate-500">#{ans.questionNumber}</span>
-                              <span className="text-sm font-bold font-mono my-0.5">
-                                {ans.selectedOption || "-"}
+                    ) : (
+                      <>
+                        {/* Ringkasan Skor Live */}
+                        <div className="p-4 rounded-xl bg-gradient-to-br from-brand-50 to-emerald-50/40 border border-brand-200">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="text-xs font-bold text-brand-900 uppercase tracking-wider block">
+                                NILAI AKHIR
                               </span>
-                              <span className="text-[9px] font-medium opacity-80">
-                                Kunci: {correctKey}
+                              <span className="text-[11px] text-brand-700 font-medium">
+                                {calculateScore(selectedItem.scanResult).correctCount} Benar dari {calculateScore(selectedItem.scanResult).totalCount} Soal
                               </span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                            <span className="text-3xl font-bold font-mono text-brand-800">
+                              {calculateScore(selectedItem.scanResult).grade}
+                            </span>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-brand-200/60 flex items-center justify-between text-[11px] text-brand-800">
+                            <span>Status Pengisian LJK:</span>
+                            <span className="font-semibold">
+                              {calculateScore(selectedItem.scanResult).validCount} / {calculateScore(selectedItem.scanResult).totalCount} Terisi Valid
+                            </span>
+                          </div>
+                        </div>
 
-                    {/* Exception Warning List */}
-                    <div>
-                      <span className="text-xs font-bold text-slate-700 block mb-2">
-                        Pemeriksaan Keraguan (Exception-First)
-                      </span>
-                      {selectedItem.warningCount === 0 ? (
-                        <div className="p-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>
-                            Semua {calculateScore(selectedItem.scanResult).totalCount} nomor terbaca mantap tanpa keraguan.
+                        {/* Rincian Jawaban Siswa vs Kunci */}
+                        <div>
+                          <span className="text-xs font-bold text-slate-700 block mb-2">
+                            Pemeriksaan Jawaban ({calculateScore(selectedItem.scanResult).totalCount} Soal)
                           </span>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {selectedItem.scanResult?.mcAnswers
-                            .filter((a) => a.status !== "VALID")
-                            .map((ans) => (
-                              <div
-                                key={ans.questionNumber}
-                                className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-between text-xs"
-                              >
-                                <span className="font-bold text-amber-900">
-                                  Soal No. {ans.questionNumber} ({ans.status})
-                                </span>
-                                <div className="flex gap-1">
-                                  {(["A", "B", "C", "D"] as const).map((opt) => (
-                                    <button
-                                      key={opt}
-                                      type="button"
-                                      onClick={() => {
-                                        if (selectedItem.scanResult) {
-                                          ans.selectedOption = opt;
-                                          ans.status = "VALID";
-                                          setItems([...items]);
-                                          toast.success(`No ${ans.questionNumber} dikoreksi jadi ${opt}`);
-                                        }
-                                      }}
-                                      className="px-2 py-0.5 rounded bg-white hover:bg-brand-700 hover:text-white border border-amber-300 font-bold transition-colors"
-                                    >
-                                      {opt}
-                                    </button>
-                                  ))}
+                          <div className="grid grid-cols-5 gap-1.5 mb-3">
+                            {selectedItem.scanResult?.mcAnswers.map((ans) => {
+                              const configItem = examConfig?.multipleChoiceQuestions?.find(
+                                (q) => q.number === ans.questionNumber
+                              );
+                              const correctKey = configItem?.correctAnswer || "A";
+                              const isCorrect = ans.status === "VALID" && ans.selectedOption === correctKey;
+                              const isWrong = ans.status === "VALID" && ans.selectedOption !== correctKey;
+
+                              return (
+                                <div
+                                  key={ans.questionNumber}
+                                  className={cn(
+                                    "p-2 rounded-lg border text-center text-xs flex flex-col items-center justify-center transition-all",
+                                    isCorrect
+                                      ? "bg-emerald-50 border-emerald-300 text-emerald-900"
+                                      : isWrong
+                                      ? "bg-rose-50 border-rose-300 text-rose-900"
+                                      : "bg-amber-50 border-amber-300 text-amber-900"
+                                  )}
+                                >
+                                  <span className="text-[10px] font-bold text-slate-500">#{ans.questionNumber}</span>
+                                  <span className="text-sm font-bold font-mono my-0.5">
+                                    {ans.selectedOption || "-"}
+                                  </span>
+                                  <span className="text-[9px] font-medium opacity-80">
+                                    Kunci: {correctKey}
+                                  </span>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
+                          </div>
                         </div>
-                      )}
-                    </div>
+
+                        {/* Exception Warning List */}
+                        <div>
+                          <span className="text-xs font-bold text-slate-700 block mb-2">
+                            Pemeriksaan Keraguan (Exception-First)
+                          </span>
+                          {selectedItem.warningCount === 0 ? (
+                            <div className="p-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span>
+                                Semua {calculateScore(selectedItem.scanResult).totalCount} nomor terbaca mantap tanpa keraguan.
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {selectedItem.scanResult?.mcAnswers
+                                .filter((a) => a.status !== "VALID")
+                                .map((ans) => (
+                                  <div
+                                    key={ans.questionNumber}
+                                    className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-between text-xs"
+                                  >
+                                    <span className="font-bold text-amber-900">
+                                      Soal No. {ans.questionNumber} ({ans.status})
+                                    </span>
+                                    <div className="flex gap-1">
+                                      {(["A", "B", "C", "D"] as const).map((opt) => (
+                                        <button
+                                          key={opt}
+                                          type="button"
+                                          onClick={() => {
+                                            if (selectedItem.scanResult) {
+                                              ans.selectedOption = opt;
+                                              ans.status = "VALID";
+                                              setItems([...items]);
+                                              toast.success(`No ${ans.questionNumber} dikoreksi jadi ${opt}`);
+                                            }
+                                          }}
+                                          className="px-2 py-0.5 rounded bg-white hover:bg-brand-700 hover:text-white border border-amber-300 font-bold transition-colors"
+                                        >
+                                          {opt}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 {/* Footer CTA */}
-                <div className="border-t border-slate-100 pt-4 flex items-center justify-between">
-                  <span className="text-xs text-slate-400">
-                    Perubahan disimpan otomatis ke sesi lokal.
+                <div className="border-t border-slate-100 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <span className="text-xs text-slate-500">
+                    {!isItemProcessed
+                      ? selectedItem.status === "PROCESSING"
+                        ? "Sedang memproses pembacaan LJK..."
+                        : "Foto belum diproses. Tekan 'Proses Semua' di bagian atas terlebih dahulu."
+                      : "Perubahan disimpan otomatis ke sesi lokal."}
                   </span>
                   <Button
                     size="md"
-                    onClick={() => {
-                      toast.success(`Lembar #${selectedIndex + 1} diverifikasi`);
-                      if (selectedIndex < items.length - 1) {
-                        setSelectedIndex((i) => i + 1);
+                    disabled={!isItemProcessed}
+                    onClick={async () => {
+                      if (!selectedItem || !isItemProcessed) return;
+                      const student = students.find((s) => s.id === selectedItem.selectedStudentId);
+                      if (!student) {
+                        toast.error("Harap pilih nama siswa terlebih dahulu.");
+                        return;
+                      }
+
+                      const score = calculateScore(selectedItem.scanResult);
+                      const scanPayload = selectedItem.scanResult || generateMockScan(selectedItem.filename, selectedIndex);
+
+                      const gradeRecord: GradedStudentRecord = {
+                        recordId: `rec-${selectedItem.id}-${Date.now()}`,
+                        examId: examConfig?.id || "exam-1",
+                        studentId: student.id,
+                        studentName: student.name,
+                        rawMCScore: score.correctCount,
+                        maxMCScore: score.totalCount,
+                        rawEssayScore: 0,
+                        maxEssayScore: 0,
+                        finalGrade: score.grade,
+                        totalPossiblePoints: score.totalCount,
+                        verifiedAt: new Date().toISOString(),
+                        scanPayload,
+                      };
+
+                      try {
+                        await saveGradeRecord(gradeRecord);
+                        toast.success(`Lembar #${selectedIndex + 1} (${student.name}) berhasil disimpan.`);
+                        if (selectedIndex < items.length - 1) {
+                          setSelectedIndex((i) => i + 1);
+                        }
+                      } catch (err) {
+                        console.error("Gagal menyimpan nilai batch:", err);
+                        toast.error("Gagal menyimpan nilai ke penyimpanan lokal.");
                       }
                     }}
-                    className="bg-brand-700 hover:bg-brand-800 text-white font-semibold flex items-center gap-2"
+                    className={cn(
+                      "font-semibold flex items-center gap-2",
+                      isItemProcessed
+                        ? "bg-brand-700 hover:bg-brand-800 text-white"
+                        : "bg-slate-200 text-slate-400 cursor-not-allowed opacity-60"
+                    )}
                   >
-                    <span>Simpan & Lembar Berikutnya</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <span>
+                      {selectedItem.status === "PROCESSING"
+                        ? "Sedang Memproses..."
+                        : !isItemProcessed
+                        ? "Foto Belum Diproses"
+                        : "Simpan & Lembar Berikutnya"}
+                    </span>
+                    {selectedItem.status === "PROCESSING" ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </div>
-            ) : (
+              );
+            })() : (
               <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400">
                 <FileText className="w-12 h-12 stroke-[1.5] mb-2" />
                 <p className="text-sm">Pilih salah satu lembar di sebelah kiri untuk melihat inspeksi.</p>

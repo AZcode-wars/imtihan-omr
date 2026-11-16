@@ -6,20 +6,75 @@ import { Button } from "@/components/ui/button";
 import { FilterChips, GradeFilter } from "@/components/grades/filter-chips";
 import { StudentGradeCard, StudentGradeRecord } from "@/components/grades/student-grade-card";
 import { GradeTableDesktop } from "@/components/grades/grade-table-desktop";
+import { getAllGradeRecords, getAllStudents, getActiveExam } from "@/lib/db";
+import { ExamConfig, GradedStudentRecord } from "@/types/omr";
 import { toast } from "sonner";
 import { Download, Search, Users } from "lucide-react";
 
-// Initial data kosong untuk siap produksi & diisi data riil
-const INITIAL_RECORDS: StudentGradeRecord[] = [];
-
 export default function GradesPage() {
-  const [records, setRecords] = React.useState<StudentGradeRecord[]>(INITIAL_RECORDS);
+  const [records, setRecords] = React.useState<StudentGradeRecord[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filter, setFilter] = React.useState<GradeFilter>("ALL");
   const [selectedRecordId, setSelectedRecordId] = React.useState<string | null>(null);
+  const [totalStudentsInClass, setTotalStudentsInClass] = React.useState(0);
+  const [passingScore, setPassingScore] = React.useState(75);
+  const [examLabel, setExamLabel] = React.useState("UTS Matematika Kelas 8A");
 
-  const passingScore = 75;
-  const totalStudentsInClass = 30;
+  // Load data dari IndexedDB saat mount
+  React.useEffect(() => {
+    async function loadData() {
+      try {
+        const [gradeRecords, students, config] = await Promise.all([
+          getAllGradeRecords(),
+          getAllStudents(),
+          getActiveExam(),
+        ]);
+
+        setTotalStudentsInClass(students.length);
+
+        if (config) {
+          setPassingScore(config.passingScore ?? 75);
+          const examTitle = config.title || "UTS Matematika";
+          const className = config.className || "Kelas 8A";
+          setExamLabel(`${examTitle} ${className}`);
+        }
+
+        // Map GradedStudentRecord ke StudentGradeRecord untuk tampilan
+        const mapped: StudentGradeRecord[] = gradeRecords.map((gr) => {
+          const isPassing = gr.finalGrade >= (config?.passingScore ?? 75);
+          return {
+            id: gr.recordId,
+            nis: "", // akan di-enrich dari students
+            name: gr.studentName,
+            mcPoints: gr.rawMCScore,
+            mcMaxPoints: gr.maxMCScore,
+            essayPoints: gr.rawEssayScore,
+            essayMaxPoints: gr.maxEssayScore,
+            finalGrade: gr.finalGrade,
+            isPassing,
+            verifiedAt: gr.verifiedAt,
+          };
+        });
+
+        // Enrich NIS dari student data
+        const studentMap = new Map(students.map((s) => [s.id, s]));
+        for (const rec of mapped) {
+          const gr = gradeRecords.find((g) => g.recordId === rec.id);
+          if (gr) {
+            const student = studentMap.get(gr.studentId);
+            if (student) {
+              rec.nis = student.nis;
+            }
+          }
+        }
+
+        setRecords(mapped);
+      } catch (err) {
+        console.warn("Gagal memuat data rekap:", err);
+      }
+    }
+    loadData();
+  }, []);
 
   // Filter & Search Records
   const filteredRecords = React.useMemo(() => {
@@ -74,7 +129,7 @@ export default function GradesPage() {
       passCount: pass,
       remedialCount: remedial,
     };
-  }, [records]);
+  }, [records, totalStudentsInClass]);
 
   const handleExportCsv = () => {
     // Format CSV id-ID (titik koma / koma desimal)
@@ -90,11 +145,11 @@ export default function GradesPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `rekap-nilai-uts-matematika-8a.csv`);
+    link.setAttribute("download", `rekap-nilai-${examLabel.toLowerCase().replace(/\s+/g, "-")}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success("Rekap_Ujian_UTS_Matematika_8A.csv berhasil diunduh.");
+    toast.success(`Rekap nilai ${examLabel} berhasil diunduh.`);
   };
 
   return (
@@ -106,7 +161,7 @@ export default function GradesPage() {
             Rekap Nilai
           </h1>
           <p className="text-sm text-slate-500">
-            Hasil koreksi ujian UTS Matematika Kelas 8A · KKM: {passingScore}
+            Hasil koreksi ujian {examLabel} · KKM: {passingScore}
           </p>
         </div>
 

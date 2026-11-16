@@ -41,3 +41,7 @@ Thumbs.db
 *.tmp
 *.log
 out/
+
+# --- Artefak pengujian & laporan ---
+.playwright-mcp/
+report/

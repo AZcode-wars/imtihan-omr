@@ -249,3 +249,58 @@ export async function getActiveExam(): Promise<ExamConfig | null> {
   });
 }
 
+/* ------------------------------------------------------------------ *
+ * Operasi Rekap Nilai (grades)
+ * ------------------------------------------------------------------ */
+
+export async function saveGradeRecord(record: GradedStudentRecord): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.GRADES, "readwrite");
+    const store = tx.objectStore(STORES.GRADES);
+    // GradedStudentRecord uses `recordId` as its natural key but
+    // the IndexedDB store was created with keyPath "id", so we map it.
+    const doc = { ...record, id: record.recordId };
+    const req = store.put(doc);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getAllGradeRecords(): Promise<GradedStudentRecord[]> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.GRADES, "readonly");
+    const store = tx.objectStore(STORES.GRADES);
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const docs = (req.result || []) as (GradedStudentRecord & { id?: string })[];
+      // Strip the extra `id` key we added for IndexedDB
+      resolve(docs.map(({ id: _id, ...rest }) => rest as GradedStudentRecord));
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deleteGradeRecord(recordId: string): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.GRADES, "readwrite");
+    const store = tx.objectStore(STORES.GRADES);
+    const req = store.delete(recordId);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deleteStudent(studentId: string): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.STUDENTS, "readwrite");
+    const store = tx.objectStore(STORES.STUDENTS);
+    const req = store.delete(studentId);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+

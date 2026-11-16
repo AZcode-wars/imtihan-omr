@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Student } from "@/types/omr";
 import { Button } from "@/components/ui/button";
+import { getAllStudents, addStudent, saveStudents, deleteStudent } from "@/lib/db";
 import { toast } from "sonner";
 import {
   Download,
@@ -14,18 +15,31 @@ import {
   Users,
 } from "lucide-react";
 
-// Initial data kosong untuk siap produksi & diisi data riil
-const INITIAL_STUDENTS: Student[] = [];
-
 export default function StudentsPage() {
-  const [students, setStudents] = React.useState<Student[]>(INITIAL_STUDENTS);
+  const [students, setStudents] = React.useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedClass, setSelectedClass] = React.useState("Kelas 8A");
+  const [isLoading, setIsLoading] = React.useState(true);
 
   // Modal Tambah Siswa
   const [isAddOpen, setIsAddOpen] = React.useState(false);
   const [newNis, setNewNis] = React.useState("");
   const [newName, setNewName] = React.useState("");
+
+  // Load siswa dari IndexedDB saat mount
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const stored = await getAllStudents();
+        setStudents(stored);
+      } catch (err) {
+        console.warn("Gagal memuat data siswa:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   const filteredStudents = students.filter(
     (s) =>
@@ -33,7 +47,7 @@ export default function StudentsPage() {
       s.nis.includes(searchQuery)
   );
 
-  const handleAddStudent = (e: React.FormEvent) => {
+  const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNis.trim() || !newName.trim()) {
       toast.error("Nama dan NIS siswa wajib diisi.");
@@ -52,16 +66,28 @@ export default function StudentsPage() {
       className: selectedClass,
     };
 
-    setStudents((prev) => [newStudent, ...prev]);
-    setNewNis("");
-    setNewName("");
-    setIsAddOpen(false);
-    toast.success(`Siswa ${newStudent.name} berhasil ditambahkan.`);
+    try {
+      await addStudent(newStudent);
+      setStudents((prev) => [newStudent, ...prev]);
+      setNewNis("");
+      setNewName("");
+      setIsAddOpen(false);
+      toast.success(`Siswa ${newStudent.name} berhasil ditambahkan.`);
+    } catch (err) {
+      console.error("Gagal menyimpan siswa:", err);
+      toast.error("Gagal menyimpan siswa ke penyimpanan lokal.");
+    }
   };
 
-  const handleDeleteStudent = (id: string, name: string) => {
-    setStudents((prev) => prev.filter((s) => s.id !== id));
-    toast.success(`${name} dihapus dari daftar.`);
+  const handleDeleteStudent = async (id: string, name: string) => {
+    try {
+      await deleteStudent(id);
+      setStudents((prev) => prev.filter((s) => s.id !== id));
+      toast.success(`${name} dihapus dari daftar.`);
+    } catch (err) {
+      console.error("Gagal menghapus siswa:", err);
+      toast.error("Gagal menghapus siswa dari penyimpanan lokal.");
+    }
   };
 
   const handleExportCsv = () => {
@@ -80,12 +106,12 @@ export default function StudentsPage() {
     toast.success("Roster siswa berhasil diekspor ke CSV.");
   };
 
-  const handleImportCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const text = event.target?.result as string;
       const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
       if (lines.length <= 1) {
@@ -108,13 +134,22 @@ export default function StudentsPage() {
       }
 
       if (imported.length > 0) {
-        setStudents((prev) => {
-          // Filter duplikat NIS
-          const existingNis = new Set(prev.map((s) => s.nis));
-          const uniqueNew = imported.filter((s) => !existingNis.has(s.nis));
-          return [...prev, ...uniqueNew];
-        });
-        toast.success(`Berhasil mengimpor ${imported.length} siswa.`);
+        // Filter duplikat NIS
+        const existingNis = new Set(students.map((s) => s.nis));
+        const uniqueNew = imported.filter((s) => !existingNis.has(s.nis));
+
+        if (uniqueNew.length > 0) {
+          try {
+            await saveStudents(uniqueNew);
+            setStudents((prev) => [...prev, ...uniqueNew]);
+            toast.success(`Berhasil mengimpor ${uniqueNew.length} siswa.`);
+          } catch (err) {
+            console.error("Gagal menyimpan import:", err);
+            toast.error("Gagal menyimpan siswa impor ke penyimpanan lokal.");
+          }
+        } else {
+          toast.info("Semua siswa sudah terdaftar, tidak ada data baru.");
+        }
       } else {
         toast.error("Format CSV tidak sesuai (diperlukan kolom: NIS, Nama).");
       }
@@ -175,7 +210,11 @@ export default function StudentsPage() {
 
       {/* Daftar Siswa */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        {filteredStudents.length === 0 ? (
+        {isLoading ? (
+          <div className="p-12 text-center text-slate-500 space-y-2">
+            <p className="font-bold text-slate-700">Memuat data siswa...</p>
+          </div>
+        ) : filteredStudents.length === 0 ? (
           <div className="p-12 text-center text-slate-500 space-y-2">
             <p className="font-bold text-slate-700">Tidak ada siswa ditemukan</p>
             <p className="text-xs text-slate-400">

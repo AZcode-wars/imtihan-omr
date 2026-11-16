@@ -6,10 +6,10 @@ import { ShutterButton } from "@/components/scan/shutter-button";
 import { VerifySheet } from "@/components/scan/verify-sheet";
 import { DesktopBatchScan } from "@/components/scan/desktop-batch-scan";
 import { Button } from "@/components/ui/button";
-import { addToQueue, getActiveExam } from "@/lib/db";
+import { addToQueue, getActiveExam, getAllStudents, saveGradeRecord } from "@/lib/db";
 import { useSync } from "@/lib/sync-context";
 import { resizeImageFile } from "@/lib/image-utils";
-import { ExamConfig, OMRScanResponse, Student } from "@/types/omr";
+import { ExamConfig, GradedStudentRecord, OMRScanResponse, Student } from "@/types/omr";
 import { toast } from "sonner";
 import {
   Camera,
@@ -22,8 +22,6 @@ import {
   Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const SAMPLE_STUDENTS: Student[] = [];
 
 export default function ScanPage() {
   const { isOnline, refreshQueueCount } = useSync();
@@ -38,17 +36,28 @@ export default function ScanPage() {
   const [torchOn, setTorchOn] = React.useState(false);
   const [scanResult, setScanResult] = React.useState<OMRScanResponse | null>(null);
   const [savedCount, setSavedCount] = React.useState(0);
-  const totalStudents = 0;
   const [examConfig, setExamConfig] = React.useState<ExamConfig | null>(null);
 
+  // Load students dari IndexedDB
+  const [students, setStudents] = React.useState<Student[]>([]);
+
   React.useEffect(() => {
-    async function loadConfig() {
-      const active = await getActiveExam();
-      if (active) setExamConfig(active);
+    async function loadInitialData() {
+      try {
+        const [active, storedStudents] = await Promise.all([
+          getActiveExam(),
+          getAllStudents(),
+        ]);
+        if (active) setExamConfig(active);
+        setStudents(storedStudents);
+      } catch (err) {
+        console.warn("Gagal memuat data awal scan:", err);
+      }
     }
-    loadConfig();
+    loadInitialData();
   }, []);
 
+  const totalStudents = students.length;
   const activePgCount = examConfig?.multipleChoiceQuestions?.length ?? 30;
 
   // Batch mobile upload queue
@@ -260,8 +269,30 @@ export default function ScanPage() {
   };
 
   // Simpan hasil verifikasi & lanjut lembar berikutnya jika batch
-  const handleSaveVerify = () => {
-    setSavedCount((c) => Math.min(totalStudents, c + 1));
+  const handleSaveVerify = async (record: any) => {
+    // Persist ke IndexedDB
+    try {
+      const gradeRecord: GradedStudentRecord = {
+        recordId: record.recordId || `rec-${Date.now()}`,
+        examId: record.examId || examConfig?.id || "exam-1",
+        studentId: record.studentId,
+        studentName: record.studentName,
+        rawMCScore: record.rawMCScore,
+        maxMCScore: record.maxMCScore,
+        rawEssayScore: record.rawEssayScore,
+        maxEssayScore: record.maxEssayScore,
+        finalGrade: record.finalGrade,
+        totalPossiblePoints: record.totalPossiblePoints,
+        verifiedAt: record.verifiedAt || new Date().toISOString(),
+        scanPayload: record.scanPayload,
+      };
+      await saveGradeRecord(gradeRecord);
+      setSavedCount((c) => Math.min(totalStudents, c + 1));
+    } catch (err) {
+      console.error("Gagal menyimpan nilai:", err);
+      toast.error("Gagal menyimpan nilai ke penyimpanan lokal.");
+      return;
+    }
 
     // Jika masih ada sisa lembar dalam upload batch mobile
     if (pendingMobileFiles.length > 0 && currentFileIndex < pendingMobileFiles.length - 1) {
@@ -282,7 +313,7 @@ export default function ScanPage() {
       {activeMode === "batch" ? (
         <div className="space-y-3">
           <DesktopBatchScan
-            students={SAMPLE_STUDENTS}
+            students={students}
             onSwitchToCamera={() => setDeviceOverride("camera")}
           />
         </div>
@@ -402,7 +433,7 @@ export default function ScanPage() {
           {scanState === "VERIFY" && scanResult && (
             <VerifySheet
               scanResult={scanResult}
-              students={SAMPLE_STUDENTS}
+              students={students}
               onClose={() => {
                 setPendingMobileFiles([]);
                 setScanState("IDLE");
