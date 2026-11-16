@@ -10,12 +10,14 @@ Menyediakan endpoint:
 from __future__ import annotations
 
 import base64
+import io
 import json
 import os
 from typing import Annotated, Any, Literal
 
 import cv2
 import numpy as np
+from PIL import Image, ImageOps
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from openomr_schemas import ExamTemplate, OMRScanResponse
@@ -86,14 +88,35 @@ class ScanJSONRequest(BaseModel):
 
 
 def decode_image_bytes(image_bytes: bytes) -> np.ndarray:
-    """Dekode bytes citra mentah menjadi format numpy BGR."""
-    np_arr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    """Dekode bytes citra mentah menjadi format numpy BGR dengan penanganan EXIF dan auto-orientasi."""
+    img: np.ndarray | None = None
+
+    # 1. Coba dekode dengan Pillow untuk mengekstrak dan menerapkan rotasi EXIF dari kamera HP
+    try:
+        pil_img = Image.open(io.BytesIO(image_bytes))
+        pil_img = ImageOps.exif_transpose(pil_img)
+        if pil_img.mode != "RGB":
+            pil_img = pil_img.convert("RGB")
+        rgb_arr = np.array(pil_img)
+        img = cv2.cvtColor(rgb_arr, cv2.COLOR_RGB2BGR)
+    except Exception:
+        # Fallback dekode langsung via OpenCV
+        np_arr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
     if img is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Berkas gambar tidak valid atau rusak.",
         )
+
+    # 2. Jika citra berorientasi menyamping (landscape: w > h),
+    # padahal template lembar LJK A4 adalah portrait (h > w),
+    # putar 90 derajat searah jarum jam agar deteksi fiducial portrait berhasil
+    h, w = img.shape[:2]
+    if w > h:
+        img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+
     return img
 
 
@@ -113,8 +136,8 @@ def decode_data_url(data_url: str) -> np.ndarray:
     return decode_image_bytes(raw_bytes)
 
 
-def check_blurriness(image: np.ndarray, threshold: float = 15.0) -> float:
-    """Hitung varians Laplacian untuk mendeteksi blur."""
+def check_blurriness(image: np.ndarray, threshold: float = 3.0) -> float:
+    """Hitung varians Laplacian untuk mendeteksi blur ekstrem."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
     variance = float(cv2.Laplacian(gray, cv2.CV_64F).var())
     if variance < threshold:
