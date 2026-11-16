@@ -14,16 +14,8 @@ import {
   Users,
 } from "lucide-react";
 
-const INITIAL_STUDENTS: Student[] = [
-  { id: "std-1", nis: "2401", name: "Ahmad Fauzi", className: "8A" },
-  { id: "std-2", nis: "2402", name: "Nadia Putri Rahma", className: "8A" },
-  { id: "std-3", nis: "2403", name: "Dimas Pratama", className: "8A" },
-  { id: "std-4", nis: "2404", name: "Siti Nurhaliza", className: "8A" },
-  { id: "std-5", nis: "2405", name: "Budi Santoso", className: "8A" },
-  { id: "std-6", nis: "2406", name: "Dewi Lestari", className: "8A" },
-  { id: "std-7", nis: "2407", name: "Rian Hidayat", className: "8A" },
-  { id: "std-8", nis: "2408", name: "Anisa Rahmawati", className: "8A" },
-];
+// Initial data kosong untuk siap produksi & diisi data riil
+const INITIAL_STUDENTS: Student[] = [];
 
 export default function StudentsPage() {
   const [students, setStudents] = React.useState<Student[]>(INITIAL_STUDENTS);

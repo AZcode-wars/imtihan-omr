@@ -23,13 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const SAMPLE_STUDENTS: Student[] = [
-  { id: "std-1", nis: "2401", name: "Ahmad Fauzi", className: "8A" },
-  { id: "std-2", nis: "2402", name: "Nadia Putri Rahma", className: "8A" },
-  { id: "std-3", nis: "2403", name: "Dimas Pratama", className: "8A" },
-  { id: "std-4", nis: "2404", name: "Siti Nurhaliza", className: "8A" },
-  { id: "std-5", nis: "2405", name: "Budi Santoso", className: "8A" },
-];
+const SAMPLE_STUDENTS: Student[] = [];
 
 export default function ScanPage() {
   const { isOnline, refreshQueueCount } = useSync();
@@ -42,8 +36,8 @@ export default function ScanPage() {
   >("IDLE");
   const [torchOn, setTorchOn] = React.useState(false);
   const [scanResult, setScanResult] = React.useState<OMRScanResponse | null>(null);
-  const [savedCount, setSavedCount] = React.useState(24);
-  const totalStudents = 30;
+  const [savedCount, setSavedCount] = React.useState(0);
+  const totalStudents = 0;
 
   // Batch mobile upload queue
   const [pendingMobileFiles, setPendingMobileFiles] = React.useState<string[]>([]);
