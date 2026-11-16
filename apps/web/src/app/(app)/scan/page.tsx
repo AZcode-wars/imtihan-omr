@@ -12,6 +12,7 @@ import { resizeImageFile } from "@/lib/image-utils";
 import { ExamConfig, GradedStudentRecord, OMRScanResponse, Student } from "@/types/omr";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Camera,
   CheckCircle2,
   FileCheck2,
@@ -37,6 +38,11 @@ export default function ScanPage() {
   const [scanResult, setScanResult] = React.useState<OMRScanResponse | null>(null);
   const [savedCount, setSavedCount] = React.useState(0);
   const [examConfig, setExamConfig] = React.useState<ExamConfig | null>(null);
+
+  // Status Akses & Kesiapan Kamera (TGG-05)
+  const [cameraStatus, setCameraStatus] = React.useState<
+    "IDLE" | "REQUESTING" | "ACTIVE" | "DENIED" | "UNAVAILABLE"
+  >("IDLE");
 
   // Load students dari IndexedDB
   const [students, setStudents] = React.useState<Student[]>([]);
@@ -79,121 +85,159 @@ export default function ScanPage() {
   const activeMode =
     deviceOverride === "auto" ? (isDesktopScreen ? "batch" : "camera") : deviceOverride;
 
-  // Inisialisasi Akses Kamera (hanya saat mode camera aktif di mobile atau jika user eksplisit memilih camera)
+  // Inisialisasi & Pengendalian Akses Kamera (TGG-05)
+  const startCamera = React.useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus("UNAVAILABLE");
+      return;
+    }
+
+    setCameraStatus("REQUESTING");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1920 } },
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          setCameraStatus("ACTIVE");
+          setScanState("LOCKED");
+        };
+      }
+    } catch (err: any) {
+      console.warn("Kamera tidak dapat diakses langsung:", err);
+      setCameraStatus("DENIED");
+      setScanState("IDLE");
+    }
+  }, []);
+
   React.useEffect(() => {
-    // Di layar desktop, jangan aktifkan kamera kecuali user eksplisit memilih 'camera'
     if (activeMode !== "camera") return;
 
-    let stream: MediaStream | null = null;
-    const startCamera = async () => {
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) return;
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1920 } },
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.warn("Kamera tidak dapat diakses langsung:", err);
-      }
-    };
-
     startCamera();
+
+    const videoEl = videoRef.current;
     return () => {
-      if (stream) {
+      if (videoEl?.srcObject) {
+        const stream = videoEl.srcObject as MediaStream;
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [activeMode]);
+  }, [activeMode, startCamera]);
 
-  // Simulasi auto-lock saat membidik LJK
-  React.useEffect(() => {
-    if (activeMode === "camera" && scanState === "IDLE") {
-      const timer = setTimeout(() => {
-        setScanState("LOCKED");
-      }, 1500);
-      return () => clearTimeout(timer);
+  // Tangkap frame citra nyata dari video kamera (KRT-02)
+  const captureFrameFromVideo = (): string | null => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2 || video.videoWidth === 0) {
+      return null;
     }
-  }, [activeMode, scanState]);
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.92);
+  };
 
-  // Handler Trigger Capture LJK
-  const handleCapture = async (imageDataUrl?: string) => {
+  // Handler Trigger Capture LJK Riil (KRT-02)
+  const handleCapture = async (imageDataUrl: string) => {
+    if (!imageDataUrl) {
+      toast.error("Tidak ada citra LJK untuk dipindai.");
+      return;
+    }
+
     setScanState("PROCESSING");
     if (navigator.vibrate) {
       navigator.vibrate(50);
     }
 
     try {
-      let result: OMRScanResponse;
+      // Jika sedang offline, masukkan langsung ke antrean IndexedDB
+      if (!isOnline) {
+        await addToQueue({
+          examId: examConfig?.id || "exam-uts-mat-8a",
+          thumbnailDataUrl: imageDataUrl,
+          imageDataUrl,
+        });
+        await refreshQueueCount();
+        toast.info("Offline: Foto scan disimpan di Antrean IndexedDB.");
+      }
 
-      if (imageDataUrl) {
-        // Jika sedang offline, masukkan langsung ke antrean IndexedDB
-        if (!isOnline) {
-          await addToQueue({
-            examId: "exam-uts-mat-8a",
-            thumbnailDataUrl: imageDataUrl,
-            imageDataUrl,
-          });
-          await refreshQueueCount();
-          toast.info("Offline: Foto scan disimpan di Antrean IndexedDB.");
-        }
+      // Ambil metadata template jika ada
+      let templatePayload: any = null;
+      try {
+        const tplRes = await fetch("/template.json");
+        if (tplRes.ok) templatePayload = await tplRes.json();
+      } catch {
+        // ignore
+      }
 
+      const res = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          template: templatePayload || {
+            id: "tpl-default-a4",
+            examId: examConfig?.id || "exam-1",
+            pageWidthMm: 210,
+            pageHeightMm: 297,
+            columnCount: 3,
+            bubbleDiameterMm: 4.5,
+            bubblePitchMm: 8.5,
+            fiducials: [],
+            nameCropRectMm: { x: 14, y: 30, w: 90, h: 20 },
+            multipleChoiceSlots: [],
+            essayAreaRectMm: { x: 14, y: 194, w: 176, h: 84 },
+          },
+          imageDataUrl,
+          sourceDevice: "MOBILE_CAMERA",
+        }),
+      });
+
+      if (!res.ok) {
+        let errorMsg = "Gagal memproses via Engine OMR.";
         try {
-          // Ambil metadata template jika ada
-          let templatePayload: any = null;
-          try {
-            const tplRes = await fetch("/template.json");
-            if (tplRes.ok) templatePayload = await tplRes.json();
-          } catch {
-            // ignore
-          }
-
-          const res = await fetch("/api/scan", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              template: templatePayload || {
-                id: "tpl-default-a4",
-                examId: "exam-1",
-                pageWidthMm: 210,
-                pageHeightMm: 297,
-                columnCount: 3,
-                bubbleDiameterMm: 4.5,
-                bubblePitchMm: 8.5,
-                fiducials: [],
-                nameCropRectMm: { x: 14, y: 30, w: 90, h: 20 },
-                multipleChoiceSlots: [],
-                essayAreaRectMm: { x: 14, y: 194, w: 176, h: 84 },
-              },
-              imageDataUrl,
-              sourceDevice: "MOBILE_CAMERA",
-            }),
-          });
-          if (res.ok) {
-            const realData = await res.json();
-            result = {
-              ...realData,
-              fullWarpedImageUrl: realData.fullWarpedImageUrl || imageDataUrl,
-              mcAnswers: (realData.mcAnswers || []).slice(0, activePgCount),
-            };
-          } else {
-            throw new Error("Gagal memproses via Engine API");
+          const errData = await res.json();
+          if (errData.error || errData.detail) {
+            errorMsg = errData.error || errData.detail;
           }
         } catch {
-          result = createMockScanResult(imageDataUrl);
+          if (res.status === 503) {
+            errorMsg = "Engine OMR tidak tersedia (503). Pastikan layanan backend aktif.";
+          }
         }
-      } else {
-        await new Promise((r) => setTimeout(r, 800));
-        result = createMockScanResult();
+        throw new Error(errorMsg);
       }
+
+      const realData = await res.json();
+      const result: OMRScanResponse = {
+        ...realData,
+        fullWarpedImageUrl: realData.fullWarpedImageUrl || imageDataUrl,
+        mcAnswers: (realData.mcAnswers || []).slice(0, activePgCount),
+      };
 
       setScanResult(result);
       setScanState("VERIFY");
-    } catch {
-      toast.error("Gagal mendeteksi LJK. Pastikan 4 sudut masuk bingkai.");
-      setScanState("IDLE");
+    } catch (err: any) {
+      console.error("Kesalahan Scan LJK:", err);
+      toast.error(err.message || "Gagal mendeteksi LJK. Pastikan 4 sudut masuk bingkai.");
+      setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
     }
+  };
+
+  // Handler tombol shutter (mengambil frame video nyata)
+  const handleShutterClick = () => {
+    if (cameraStatus !== "ACTIVE") {
+      toast.error("Kamera belum siap. Izinkan akses kamera atau pilih foto dari penyimpanan.");
+      return;
+    }
+    const frame = captureFrameFromVideo();
+    if (!frame) {
+      toast.error("Frame video kamera belum siap. Arahkan kamera ke lembar LJK.");
+      return;
+    }
+    handleCapture(frame);
   };
 
   // Handler Multi-Upload Mobile dengan Resize & Antrean
@@ -218,7 +262,7 @@ export default function ScanPage() {
         // Jika offline, simpan otomatis ke IndexedDB
         if (!isOnline) {
           await addToQueue({
-            examId: "exam-uts-mat-8a",
+            examId: examConfig?.id || "exam-uts-mat-8a",
             thumbnailDataUrl: dataUrl,
             imageDataUrl: dataUrl,
           });
@@ -235,37 +279,6 @@ export default function ScanPage() {
       await refreshQueueCount();
       toast.success(`${processedDataUrls.length} lembar siap diverifikasi`);
     }
-  };
-
-  // Mock Scan Generator
-  const createMockScanResult = (previewImg?: string): OMRScanResponse => {
-    return {
-      scanId: `scan-${Date.now()}`,
-      sourceDevice: "MOBILE_CAMERA",
-      timestamp: new Date().toISOString(),
-      studentNameCropUrl: "",
-      fullWarpedImageUrl: previewImg || "/sheet-preview.png",
-      essayAreaCropUrl: "",
-      mcAnswers: Array.from({ length: activePgCount }, (_, i) => {
-        const qNum = i + 1;
-        if (qNum === 7 && activePgCount >= 7) {
-          return { questionNumber: qNum, selectedOption: null, status: "EMPTY", confidence: 0.95 };
-        }
-        if (qNum === 11 && activePgCount >= 11) {
-          return { questionNumber: qNum, selectedOption: null, status: "MULTIPLE", confidence: 0.92, rawCandidates: ["A", "C"] };
-        }
-        if (qNum === 13 && activePgCount >= 13) {
-          return { questionNumber: qNum, selectedOption: "A", status: "LOW_CONFIDENCE", confidence: 0.52, rawCandidates: ["A"] };
-        }
-        return {
-          questionNumber: qNum,
-          selectedOption: (["A", "B", "C", "D"] as const)[i % 4],
-          status: "VALID",
-          confidence: 0.98,
-          rawCandidates: [(["A", "B", "C", "D"] as const)[i % 4]],
-        };
-      }),
-    };
   };
 
   // Simpan hasil verifikasi & lanjut lembar berikutnya jika batch
@@ -303,7 +316,7 @@ export default function ScanPage() {
     } else {
       setPendingMobileFiles([]);
       setScanResult(null);
-      setScanState("IDLE");
+      setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
     }
   };
 
@@ -331,7 +344,10 @@ export default function ScanPage() {
             autoPlay
             playsInline
             muted
-            className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none"
+            className={cn(
+              "absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none",
+              cameraStatus === "ACTIVE" ? "opacity-60" : "opacity-0"
+            )}
           />
 
           {/* Overlay Atas: Progress Siswa, Batch File Upload & Senter */}
@@ -383,7 +399,7 @@ export default function ScanPage() {
             <CornerBracket state={scanState === "VERIFY" ? "IDLE" : scanState} />
 
             {/* Status Pill di Bawah Bingkai */}
-            <div className="mt-4">
+            <div className="mt-4 flex flex-col items-center gap-2">
               {scanState === "PROCESSING" ? (
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-950/90 border border-brand-400/40 text-brand-300 text-xs font-semibold backdrop-blur-md animate-pulse">
                   <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
@@ -393,10 +409,38 @@ export default function ScanPage() {
                       : "Memproses Pembacaan LJK..."}
                   </span>
                 </div>
-              ) : scanState === "LOCKED" ? (
+              ) : cameraStatus === "DENIED" || cameraStatus === "UNAVAILABLE" ? (
+                <div className="flex flex-col items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900/90 border border-rose-500/40 text-slate-200 text-xs backdrop-blur-md shadow-lg text-center max-w-xs">
+                  <div className="flex items-center gap-1.5 text-rose-400 font-bold">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>Kamera Tidak Dapat Diakses</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    {cameraStatus === "DENIED"
+                      ? "Izin akses kamera ditolak di browser. Silakan beri izin atau gunakan tombol 'Pilih Foto LJK'."
+                      : "Perangkat kamera tidak ditemukan di peramban ini."}
+                  </p>
+                  {cameraStatus === "DENIED" && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={startCamera}
+                      className="mt-1 text-xs h-7 gap-1"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Coba Lagi</span>
+                    </Button>
+                  )}
+                </div>
+              ) : cameraStatus === "REQUESTING" ? (
+                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-700 text-slate-300 text-xs font-medium backdrop-blur-md">
+                  <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
+                  <span>Meminta izin akses kamera...</span>
+                </div>
+              ) : scanState === "LOCKED" && cameraStatus === "ACTIVE" ? (
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-950/90 border border-brand-400/40 text-brand-300 text-xs font-bold backdrop-blur-md shadow-lg">
                   <CheckCircle2 className="w-4 h-4 text-brand-400" />
-                  <span>4 Sudut Terdeteksi • Siap Capture</span>
+                  <span>Kamera Aktif • Arahkan ke 4 Kotak Sudut LJK</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 text-white/70 text-xs font-medium backdrop-blur-md">
@@ -419,13 +463,15 @@ export default function ScanPage() {
           {/* Action Bar Bawah: Shutter */}
           <div className="relative z-20 bg-slate-900/90 backdrop-blur-md border-t border-white/10 p-5 flex flex-col items-center gap-3">
             <ShutterButton
-              isLocked={scanState === "LOCKED"}
-              disabled={scanState === "PROCESSING"}
-              onClick={() => handleCapture()}
+              isLocked={scanState === "LOCKED" && cameraStatus === "ACTIVE"}
+              disabled={scanState === "PROCESSING" || cameraStatus !== "ACTIVE"}
+              onClick={handleShutterClick}
             />
 
             <p className="text-[11px] text-slate-400 text-center max-w-xs">
-              Kamera otomatis mendeteksi 4 fiducial marker stabil atau ketuk tombol di atas untuk scan manual.
+              {cameraStatus === "ACTIVE"
+                ? "Pastikan 4 kotak sudut fiducial berada di dalam bingkai, lalu ketuk tombol rana untuk memotret."
+                : "Aktifkan izin kamera atau pilih berkas foto LJK untuk memulai."}
             </p>
           </div>
 
@@ -436,7 +482,7 @@ export default function ScanPage() {
               students={students}
               onClose={() => {
                 setPendingMobileFiles([]);
-                setScanState("IDLE");
+                setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
               }}
               onSave={handleSaveVerify}
             />

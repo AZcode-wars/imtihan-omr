@@ -78,13 +78,14 @@ export function VerifySheet({
     React.useState<number | null>(null);
 
   // State Nilai Esai Guru (sesuai jumlah esai pada ujian aktif)
+  // Default: Belum dinilai (0 poin / INCORRECT) agar nilai tidak terinflasi sebelum diperiksa guru
   const essayCount = examConfig?.essayQuestions?.length ?? 0;
   const [essayMarks, setEssayMarks] = React.useState<EssayMark[]>(() => {
     return Array.from({ length: essayCount }, (_, i) => ({
       questionNumber: i + 1,
       maxScore: examConfig?.essayQuestions[i]?.maxScore || 5,
-      outcome: "CORRECT",
-      pointsAwarded: examConfig?.essayQuestions[i]?.maxScore || 5,
+      outcome: "INCORRECT",
+      pointsAwarded: 0,
     }));
   });
 
@@ -94,8 +95,8 @@ export function VerifySheet({
         examConfig.essayQuestions.map((eq) => ({
           questionNumber: eq.number,
           maxScore: eq.maxScore,
-          outcome: "CORRECT",
-          pointsAwarded: eq.maxScore,
+          outcome: "INCORRECT",
+          pointsAwarded: 0,
         }))
       );
     }
@@ -259,13 +260,13 @@ export function VerifySheet({
                     className="h-10 object-contain rounded mt-1 border border-slate-200"
                   />
                 ) : (
-                  <p className="font-caveat text-2xl font-bold text-slate-800 leading-tight">
-                    Ahmad Fauzan
+                  <p className="text-xs text-slate-400 italic py-1 mt-0.5">
+                    (Potongan tulisan nama tidak terdeteksi otomatis)
                   </p>
                 )}
               </div>
-              <span className="text-[10px] font-mono text-slate-400 px-2 py-1 rounded bg-slate-100">
-                Kelas 8A
+              <span className="text-[10px] font-mono text-slate-500 px-2 py-1 rounded bg-slate-100">
+                {examConfig?.className || "Kelas Aktif"}
               </span>
             </div>
 
