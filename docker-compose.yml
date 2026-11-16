@@ -1,0 +1,23 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://omr-engine:8000
+    depends_on:
+      - omr-engine
+    restart: unless-stopped
+
+  omr-engine:
+    build:
+      context: .
+      dockerfile: packages/omr-engine/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

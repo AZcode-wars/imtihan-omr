@@ -19,8 +19,14 @@ const caveat = Caveat({
 });
 
 export const metadata: Metadata = {
-  title: "OpenOMR",
-  description: "Open-source mobile OMR scanner untuk koreksi ujian cepat.",
+  title: "ImtihanOMR",
+  description: "Mobile OMR scanner untuk koreksi ujian cepat.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ImtihanOMR",
+  },
 };
 
 export const viewport: Viewport = {
