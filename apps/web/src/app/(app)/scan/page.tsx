@@ -30,7 +30,6 @@ import {
   RefreshCw,
   Upload,
   X,
-  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -84,8 +83,7 @@ export default function ScanPage() {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = React.useRef<MediaStream | null>(null);
 
-  // Fitur Auto-Shutter & Deteksi 4 Sudut LJK
-  const [autoShutter, setAutoShutter] = React.useState(true);
+  // Panduan Visual Deteksi 4 Sudut LJK
   const [detectedCorners, setDetectedCorners] = React.useState<CornerFlags>({
     tl: false,
     tr: false,
@@ -93,12 +91,6 @@ export default function ScanPage() {
     br: false,
   });
   const [isShutterFlashing, setIsShutterFlashing] = React.useState(false);
-  const consecutiveHitsRef = React.useRef(0);
-  const autoCaptureBusyRef = React.useRef(false);
-  const hasTriggeredCurrentSheetRef = React.useRef(false);
-  const cooldownUntilRef = React.useRef(0);
-  const [cooldownCountdown, setCooldownCountdown] = React.useState(0);
-  const cameraReadyTimeRef = React.useRef<number>(0);
   const offscreenCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
   // Deteksi otomatis lebar layar peramban (breakpoint lg: 1024px)
@@ -136,7 +128,6 @@ export default function ScanPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
-          cameraReadyTimeRef.current = Date.now();
           setCameraStatus("ACTIVE");
           setScanState("LOCKED");
         };
@@ -167,11 +158,10 @@ export default function ScanPage() {
     };
   }, [activeMode, startCamera]);
 
-  // Auto-Shutter loop: mengevaluasi frame setiap 200ms saat kamera aktif
+  // Panduan visual sudut LJK: mengevaluasi frame setiap 200ms saat kamera aktif
   React.useEffect(() => {
     if (cameraStatus !== "ACTIVE" || scanState !== "LOCKED") {
       setDetectedCorners({ tl: false, tr: false, bl: false, br: false });
-      consecutiveHitsRef.current = 0;
       return;
     }
 
@@ -188,24 +178,12 @@ export default function ScanPage() {
     let isDisposed = false;
 
     const interval = setInterval(() => {
-      const now = Date.now();
-
-      // Cek apakah masih dalam masa jeda cooldown
-      if (now < cooldownUntilRef.current) {
-        setCooldownCountdown(Math.ceil((cooldownUntilRef.current - now) / 1000));
-        return;
-      } else {
-        setCooldownCountdown(0);
-      }
-
       const video = videoRef.current;
       if (
         isDisposed ||
         !video ||
         video.readyState < 2 ||
-        video.videoWidth === 0 ||
-        autoCaptureBusyRef.current ||
-        now - cameraReadyTimeRef.current < 900 // Jeda 900ms pemanasan sensor & autofocus kamera
+        video.videoWidth === 0
       ) {
         return;
       }
@@ -214,47 +192,7 @@ export default function ScanPage() {
         ctx.drawImage(video, 0, 0, 320, 450);
         const imgData = ctx.getImageData(0, 0, 320, 450);
         const res = detectFiducialsFromImageData(imgData);
-
         setDetectedCorners(res.corners);
-
-        // Jika lembar sebelumnya telah diangkat/dijauhkan (kurang dari 2 sudut terdeteksi),
-        // reset kunci lembar agar siap memindai lembar berikutnya
-        if (res.cornerCount <= 1) {
-          hasTriggeredCurrentSheetRef.current = false;
-        }
-
-        // Jika autoShutter aktif dan ke-4 sudut fiducial terdeteksi tajam
-        if (
-          autoShutter &&
-          res.detected &&
-          !autoCaptureBusyRef.current &&
-          !hasTriggeredCurrentSheetRef.current
-        ) {
-          consecutiveHitsRef.current += 1;
-
-          // Trigger capture seketika saat ke-4 sudut terdeteksi
-          if (consecutiveHitsRef.current >= 1) {
-            autoCaptureBusyRef.current = true;
-            hasTriggeredCurrentSheetRef.current = true;
-            setIsShutterFlashing(true);
-            setTimeout(() => setIsShutterFlashing(false), 220);
-
-            if (navigator.vibrate) {
-              navigator.vibrate([40, 30, 40]);
-            }
-
-            toast.info("4 Sudut LJK terkunci! Memindai...", { duration: 1500 });
-            const frame = captureFrameFromVideo();
-            if (frame) {
-              handleCapture(frame);
-            } else {
-              autoCaptureBusyRef.current = false;
-              hasTriggeredCurrentSheetRef.current = false;
-            }
-          }
-        } else {
-          consecutiveHitsRef.current = 0;
-        }
       } catch (err) {
         // Abaikan error sesaat saat render canvas
       }
@@ -264,7 +202,7 @@ export default function ScanPage() {
       isDisposed = true;
       clearInterval(interval);
     };
-  }, [cameraStatus, scanState, autoShutter]);
+  }, [cameraStatus, scanState]);
 
   // Tangkap frame citra nyata dari video kamera (KRT-02)
   const captureFrameFromVideo = (): string | null => {
@@ -354,14 +292,7 @@ export default function ScanPage() {
         toast.error(errorMsg || "Gagal mendeteksi LJK. Pastikan 4 sudut masuk bingkai.");
       }
 
-      // Berikan cooldown 3.5 detik agar kamera TIDAK memotret berulang kali tiada henti
-      cooldownUntilRef.current = Date.now() + 3500;
       setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
-
-      setTimeout(() => {
-        autoCaptureBusyRef.current = false;
-        consecutiveHitsRef.current = 0;
-      }, 3500);
     }
   };
 
@@ -465,12 +396,6 @@ export default function ScanPage() {
       setPendingMobileFiles([]);
       setScanResult(null);
       setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
-      cooldownUntilRef.current = Date.now() + 2500;
-      hasTriggeredCurrentSheetRef.current = true;
-      setTimeout(() => {
-        autoCaptureBusyRef.current = false;
-        consecutiveHitsRef.current = 0;
-      }, 2500);
     }
   };
 
@@ -540,28 +465,6 @@ export default function ScanPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Toggle Auto-Shutter */}
-              <button
-                type="button"
-                onClick={() => {
-                  setAutoShutter((prev) => {
-                    const next = !prev;
-                    toast.info(next ? "Auto-shutter diaktifkan (memotret otomatis saat 4 sudut terkunci)" : "Auto-shutter dinonaktifkan (mode manual)");
-                    return next;
-                  });
-                }}
-                className={cn(
-                  "px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold backdrop-blur-md border transition-all cursor-pointer",
-                  autoShutter
-                    ? "bg-emerald-600 text-white border-emerald-400 shadow-md ring-2 ring-emerald-400/30"
-                    : "bg-black/60 text-white/70 border-white/15 hover:bg-black/80"
-                )}
-                title={autoShutter ? "Auto-Shutter Aktif" : "Auto-Shutter Nonaktif"}
-              >
-                <Zap className={cn("w-3.5 h-3.5", autoShutter ? "fill-current text-white" : "text-white/60")} />
-                <span>{autoShutter ? "Auto-Shutter" : "Manual"}</span>
-              </button>
-
               {/* Tombol Upload Batch File LJK */}
               <label
                 className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-white/90 flex items-center justify-center hover:bg-black/80 transition-colors cursor-pointer"
@@ -641,21 +544,11 @@ export default function ScanPage() {
                   <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
                   <span>Meminta izin akses kamera...</span>
                 </div>
-              ) : cooldownCountdown > 0 ? (
-                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-950/90 border border-amber-400/60 text-amber-300 text-xs font-semibold backdrop-blur-md shadow-md animate-pulse">
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                  <span>Menyiapkan pemindaian ulang ({cooldownCountdown}s)...</span>
-                </div>
-              ) : hasTriggeredCurrentSheetRef.current && scanState === "LOCKED" ? (
-                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-white/20 text-slate-200 text-xs font-medium backdrop-blur-md shadow-md">
-                  <CheckCircle2 className="w-4 h-4 text-brand-400" />
-                  <span>Ganti ke lembar LJK berikutnya</span>
-                </div>
               ) : scanState === "LOCKED" && cameraStatus === "ACTIVE" ? (
                 detectedCorners.tl && detectedCorners.tr && detectedCorners.bl && detectedCorners.br ? (
                   <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/90 border border-emerald-400/80 text-emerald-300 text-xs font-bold backdrop-blur-md shadow-[0_0_15px_rgba(52,211,153,0.4)] animate-pulse">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>4/4 Sudut Terkunci! {autoShutter ? "Memindai Otomatis..." : "Ketuk Tombol Rana"}</span>
+                    <span>4/4 Sudut Pas! Tekan Tombol Rana</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/75 border border-white/20 text-white text-xs font-medium backdrop-blur-md shadow-md">
@@ -699,9 +592,7 @@ export default function ScanPage() {
             />
 
             <p className="text-[11px] text-slate-400 text-center max-w-xs leading-relaxed">
-              {autoShutter
-                ? "Auto-Shutter aktif: Begitu 4 sudut kotak sejajar, kamera langsung memotret otomatis."
-                : "Ketuk tombol lingkaran di atas untuk memotret secara manual."}
+              Pastikan 4 sudut lembar masuk dalam bingkai, lalu ketuk tombol lingkaran untuk memotret.
             </p>
           </div>
 
@@ -714,12 +605,6 @@ export default function ScanPage() {
                 setPendingMobileFiles([]);
                 setScanResult(null);
                 setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
-                cooldownUntilRef.current = Date.now() + 2500;
-                hasTriggeredCurrentSheetRef.current = true;
-                setTimeout(() => {
-                  autoCaptureBusyRef.current = false;
-                  consecutiveHitsRef.current = 0;
-                }, 2500);
               }}
               onSave={handleSaveVerify}
             />
