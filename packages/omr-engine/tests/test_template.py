@@ -104,21 +104,24 @@ def test_bubble_diameter_tidak_bertabrakan() -> None:
     assert BUBBLE_PITCH_MM > BUBBLE_DIAMETER_MM
 
 
-def test_dua_kolom_pilihan_ganda() -> None:
+def test_tiga_kolom_pilihan_ganda() -> None:
     template = build_template(pg_count=25, essay_count=0)
     xs = sorted({slot["xMm"] for slot in template["multipleChoiceSlots"]})
-    assert len(xs) == 2
-    assert template["columnCount"] == 2
+    assert len(xs) == 3
+    assert template["columnCount"] == 3
 
 
-def test_penomoran_berjalan_kolom_1_lalu_kolom_2() -> None:
+def test_penomoran_berjalan_kolom_1_lalu_kolom_2_lalu_kolom_3() -> None:
     template = build_template(pg_count=25, essay_count=0)
     slots = template["multipleChoiceSlots"]
     assert slots[0]["questionNumber"] == 1
-    # 25 soal -> 13 baris: kolom 1 berisi soal 1-13, kolom 2 berisi 14-25
-    assert slots[12]["questionNumber"] == 13
-    assert slots[13]["questionNumber"] == 14
-    assert slots[13]["xMm"] > slots[0]["xMm"]  # soal 14 pindah ke kolom 2
+    # 25 soal -> 9 baris/kolom: kolom 1 (1-9), kolom 2 (10-18), kolom 3 (19-25)
+    assert slots[8]["questionNumber"] == 9
+    assert slots[9]["questionNumber"] == 10
+    assert slots[9]["xMm"] > slots[0]["xMm"]  # soal 10 pindah ke kolom 2
+    assert slots[17]["questionNumber"] == 18
+    assert slots[18]["questionNumber"] == 19
+    assert slots[18]["xMm"] > slots[9]["xMm"]  # soal 19 pindah ke kolom 3
     assert slots[24]["questionNumber"] == 25
 
 
@@ -275,38 +278,38 @@ def test_template_bisa_diserialisasi_ulang() -> None:
 
 def test_kombinasi_yang_tidak_muat_ditolak_dengan_pesan_bergerak() -> None:
     with pytest.raises(TemplateOverflowError) as exc:
-        build_template(pg_count=41, essay_count=5)
+        build_template(pg_count=50, essay_count=5)
     message = str(exc.value)
-    assert "41" in message
+    assert "50" in message
     assert "tidak muat" in message
     assert "dua halaman" in message
 
 
 def test_batas_praktis_tercatat() -> None:
-    """40 PG tanpa zona esai masih muat; 41 sudah tidak.
+    """60 PG tanpa zona esai masih muat (3 kolom x 20 baris); 61 sudah tidak.
 
     Batas ini dibatasi jarak antar pusat 8,5 mm (PRD FR-1.2) plus jeda
-    pengelompokan 5 nomor — bukan pilihan desain. Antarmuka /setup harus
-    memberi tahu guru sebelum mencetak.
+    pengelompokan 5 nomor (3,5 mm) dalam 3 kolom dengan slot identitas 2 baris
+    (Nama + Mapel & Kelas + Tanggal).
     """
-    assert compute_layout(40, 0).content_bottom_y <= CONTENT_BOTTOM_MM
+    assert compute_layout(60, 0).content_bottom_y <= CONTENT_BOTTOM_MM
     with pytest.raises(TemplateOverflowError):
-        build_template(pg_count=41, essay_count=0)
+        build_template(pg_count=61, essay_count=0)
 
 
 def test_zona_esai_membatasi_jumlah_pg() -> None:
     """Dengan zona esai, kapasitas PG turun (zona esai butuh ruang)."""
-    assert max_pg_count_for(0) == 40
-    assert max_pg_count_for(5) == 30
+    assert max_pg_count_for(0) == 60
+    assert max_pg_count_for(5) == 45
 
 
 def test_max_essay_count_memberi_petunjuk_untuk_ui() -> None:
     # Zona esai kini satu kotak besar: jumlah soal esai tidak mengubah
     # tinggi area, jadi batasnya hanya "ada zona esai atau tidak".
     assert max_essay_count_for(25) == 10
-    assert max_essay_count_for(30) == 10
-    # 40 PG tidak muat kalau zona esai ikutada.
-    assert max_essay_count_for(40) == 0
+    assert max_essay_count_for(45) == 10
+    # 50 PG tidak muat kalau zona esai ikut ada.
+    assert max_essay_count_for(50) == 0
 
 
 def test_jumlah_pg_nol_ditolak() -> None:

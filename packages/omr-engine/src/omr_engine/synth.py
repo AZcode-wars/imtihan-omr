@@ -30,11 +30,13 @@ import numpy as np
 from .pdf import render_pdf
 from .template import (
     CLASS_BOX_RECT_MM,
+    COLUMN_X_MM,
     CONTENT_LEFT_MM,
     ESSAY_AREA_GAP_MM,
     INSTRUCTION_BOX_RECT_MM,
     INSTRUCTION_COLUMNS,
     INSTRUCTIONS,
+    MC_OPTION_OFFSET_MM,
     MC_SECTION_TITLE_Y_MM,
     PAPER_TITLE_X_MM,
     PAPER_TITLE_Y_MM,
@@ -204,29 +206,43 @@ def render_synthetic(
     cw, ch = _px(crop["w"], px_per_mm), _px(crop["h"], px_per_mm)
     _dashed_rect(img, cx, cy, cw, ch, faint)
     cv2.putText(
-        img, "NAMA", (cx + 6, cy + 24), cv2.FONT_HERSHEY_SIMPLEX, 0.3, faint, 1, cv2.LINE_AA
+        img, "NAMA", (cx + 6, cy + 22), cv2.FONT_HERSHEY_SIMPLEX, 0.28, faint, 1, cv2.LINE_AA
     )
     cv2.putText(
         img,
         "____________________",
-        (cx + 34, cy + 26),
+        (cx + 90, cy + 24),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.4,
         faint,
         1,
         cv2.LINE_AA,
     )
+    cv2.putText(
+        img, "MAPEL", (cx + 6, cy + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.28, faint, 1, cv2.LINE_AA
+    )
+    cv2.putText(
+        img,
+        "____________________",
+        (cx + 90, cy + 57),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.4,
+        faint,
+        1,
+        cv2.LINE_AA,
+    )
+
     klass = CLASS_BOX_RECT_MM
     kx, ky = _px(klass["x"], px_per_mm), _px(klass["y"], px_per_mm)
     kw, kh = _px(klass["w"], px_per_mm), _px(klass["h"], px_per_mm)
     _dashed_rect(img, kx, ky, kw, kh, faint)
     cv2.putText(
-        img, "KELAS", (kx + 4, ky + 11), cv2.FONT_HERSHEY_SIMPLEX, 0.3, faint, 1, cv2.LINE_AA
+        img, "KELAS", (kx + 6, ky + 22), cv2.FONT_HERSHEY_SIMPLEX, 0.28, faint, 1, cv2.LINE_AA
     )
     cv2.putText(
         img,
         "____________________",
-        (kx + 34, ky + 13),
+        (kx + 75, cy + 24),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.4,
         faint,
@@ -234,12 +250,12 @@ def render_synthetic(
         cv2.LINE_AA,
     )
     cv2.putText(
-        img, "NO. ABSEN", (kx + 4, ky + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.3, faint, 1, cv2.LINE_AA
+        img, "TANGGAL", (kx + 6, ky + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.28, faint, 1, cv2.LINE_AA
     )
     cv2.putText(
         img,
         "____________________",
-        (kx + 34, ky + 27),
+        (kx + 75, cy + 57),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.4,
         faint,
@@ -253,22 +269,79 @@ def render_synthetic(
     gw, gh = _px(guide["w"], px_per_mm), _px(guide["h"], px_per_mm)
     _dashed_rect(img, gx, gy, gw, gh, faint)
     cv2.putText(
-        img, "PETUNJUK", (gx + 6, gy + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.32, faint, 1, cv2.LINE_AA
+        img, "PETUNJUK", (gx + 6, gy + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.3, faint, 1, cv2.LINE_AA
     )
-    col_w = gw / INSTRUCTION_COLUMNS
+
+    # Kolom kiri: teks aturan
     for i, line in enumerate(INSTRUCTIONS):
-        col = i % INSTRUCTION_COLUMNS
-        row = i // INSTRUCTION_COLUMNS
         cv2.putText(
             img,
             f"- {line}",
-            (int(gx + 6 + col * col_w), gy + 34 + row * 18),
+            (gx + 6, gy + 32 + i * 18),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.3,
+            0.26,
             faint,
             1,
             cv2.LINE_AA,
         )
+
+    # Kolom kanan: visualisasi contoh pengisian
+    ex_gx = gx + _px(105.0, px_per_mm)
+    cv2.putText(
+        img,
+        "Petunjuk Pengisian:",
+        (ex_gx, gy + 18),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.28,
+        faint,
+        1,
+        cv2.LINE_AA,
+    )
+    c_cy = gy + 52
+    ex_r = _px(1.8, px_per_mm)
+
+    # Benar: terisi penuh
+    b_cx = ex_gx + _px(5.0, px_per_mm)
+    cv2.circle(img, (b_cx, c_cy), ex_r, ink, 1, cv2.LINE_AA)
+    cv2.circle(img, (b_cx, c_cy), ex_r, ink, -1, cv2.LINE_AA)
+    cv2.putText(
+        img,
+        "[v] Benar",
+        (b_cx + ex_r + 4, c_cy + 3),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.26,
+        ink,
+        1,
+        cv2.LINE_AA,
+    )
+
+    # Salah 1: disilang
+    s1_cx = ex_gx + _px(30.0, px_per_mm)
+    cv2.circle(img, (s1_cx, c_cy), ex_r, ink, 1, cv2.LINE_AA)
+    cv2.line(img, (s1_cx - ex_r + 2, c_cy - ex_r + 2), (s1_cx + ex_r - 2, c_cy + ex_r - 2), ink, 1)
+    cv2.line(img, (s1_cx - ex_r + 2, c_cy + ex_r - 2), (s1_cx + ex_r - 2, c_cy - ex_r + 2), ink, 1)
+
+    # Salah 2: dicentang
+    s2_cx = ex_gx + _px(38.0, px_per_mm)
+    cv2.circle(img, (s2_cx, c_cy), ex_r, ink, 1, cv2.LINE_AA)
+    cv2.line(img, (s2_cx - 3, c_cy), (s2_cx - 1, c_cy + 3), ink, 1)
+    cv2.line(img, (s2_cx - 1, c_cy + 3), (s2_cx + 4, c_cy - 4), ink, 1)
+
+    # Salah 3: tidak penuh
+    s3_cx = ex_gx + _px(46.0, px_per_mm)
+    cv2.circle(img, (s3_cx, c_cy), ex_r, ink, 1, cv2.LINE_AA)
+    cv2.circle(img, (s3_cx, c_cy), ex_r // 2, ink, -1, cv2.LINE_AA)
+
+    cv2.putText(
+        img,
+        "[x] Salah",
+        (s3_cx + ex_r + 4, c_cy + 3),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.26,
+        ink,
+        1,
+        cv2.LINE_AA,
+    )
 
     # --- Pilihan Ganda ---
     cv2.putText(
@@ -283,6 +356,22 @@ def render_synthetic(
     )
     mc_truth = plan_answers(len(template["multipleChoiceSlots"]))
     truth_by_number = {t["questionNumber"]: t for t in mc_truth}
+
+    # Header label opsi A, B, C, D di atas setiap kolom
+    header_y_px = _px(MC_SECTION_TITLE_Y_MM + 4.5, px_per_mm)
+    for col_x in COLUMN_X_MM:
+        for k, label in enumerate(("A", "B", "C", "D")):
+            opt_x_mm = col_x + MC_OPTION_OFFSET_MM + k * template["bubblePitchMm"]
+            cv2.putText(
+                img,
+                label,
+                (_px(opt_x_mm, px_per_mm) - 3, header_y_px),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.3,
+                faint,
+                1,
+                cv2.LINE_AA,
+            )
 
     for slot in template["multipleChoiceSlots"]:
         number = slot["questionNumber"]

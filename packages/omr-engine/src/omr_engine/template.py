@@ -56,40 +56,39 @@ FIDUCIAL_OTHER_MM = 10.0
 CONTENT_LEFT_MM = 14.0
 CONTENT_WIDTH_MM = 176.0
 
-COLUMN_COUNT = 2
-COLUMN_X_MM = (14.0, 108.0)
+COLUMN_COUNT = 3
+COLUMN_X_MM = (14.0, 78.5, 143.0)
 
 OPTION_LABELS = ("A", "B", "C", "D")
-MC_OPTION_OFFSET_MM = 12.0  # jarak dari x kolom ke pusat option pertama
+MC_OPTION_OFFSET_MM = 10.0  # jarak dari x kolom ke pusat option pertama (A)
 
 #: Pengelompokan: setiap GROUP_SIZE nomor soal dikelompokkan, dengan jarak
 #: antar kelompok lebih jauh daripada jarak antar nomor di dalam kelompok.
 GROUP_SIZE = 5
-GROUP_GAP_MM = 7.0
+GROUP_GAP_MM = 3.5
 
 #: Judul utama. X-nya di KANAN fiducial kiri-atas (yang berakhir di 22 mm).
 PAPER_TITLE_X_MM = 25.0
 PAPER_TITLE_Y_MM = 26.0
 
-NAME_CROP_RECT_MM = {"x": 14.0, "y": 30.0, "w": 90.0, "h": 12.0}
-CLASS_BOX_RECT_MM = {"x": 110.0, "y": 30.0, "w": 80.0, "h": 12.0}
+NAME_CROP_RECT_MM = {"x": 14.0, "y": 30.0, "w": 90.0, "h": 20.0}
+CLASS_BOX_RECT_MM = {"x": 110.0, "y": 30.0, "w": 80.0, "h": 20.0}
 
 #: Kotak petunjuk — dipindahkan ke bawah kotak nama & kelas, melingkupi lebar
 #: konten. Isinya ditata dua kolom supaya kotaknya tetap ringkas.
-INSTRUCTION_BOX_RECT_MM = {"x": 14.0, "y": 46.0, "w": 176.0, "h": 16.0}
+INSTRUCTION_BOX_RECT_MM = {"x": 14.0, "y": 54.0, "w": 176.0, "h": 22.0}
 INSTRUCTIONS = (
-    "Isilah dengan pensil 2B",
-    "Jangan memakai bolpoin",
-    "Coret jawaban yang salah",
-    "Tulis nama dan kelas dengan jelas",
+    "Jawab dengan memenuhi lingkaran pada jawaban yang tepat.",
+    "Gunakan pensil 2B, tidak disarankan menggunakan bolpoin.",
+    "Tuliskan nama dan kelas dengan jelas.",
 )
 #: Jumlah kolom teks di dalam kotak petunjuk.
 INSTRUCTION_COLUMNS = 2
 
 #: Judul seksi "I. PILIHAN GANDA".
-MC_SECTION_TITLE_Y_MM = 78.0
+MC_SECTION_TITLE_Y_MM = 86.0
 #: Baris bubble pertama. Jarak ke judul seksi = 10 mm.
-MC_START_Y_MM = 88.0
+MC_START_Y_MM = 96.0
 
 #: Jarak dari dasar baris PG terakhir ke baseline judul zona esai.
 ESSAY_TITLE_GAP_MM = 13.75
@@ -283,7 +282,7 @@ def max_pg_count_for(essay_count: int) -> int:
 def build_template(
     exam_id: str = "exam-1",
     template_id: str = "tpl-1",
-    pg_count: int = 25,
+    pg_count: int = 30,
     essay_count: int = 5,
 ) -> dict:
     """Bangun objek ``ExamTemplate`` (siap diserialisasi ke JSON).
@@ -358,7 +357,7 @@ def build_template(
 def build_validated_template(
     exam_id: str = "exam-1",
     template_id: str = "tpl-1",
-    pg_count: int = 25,
+    pg_count: int = 30,
     essay_count: int = 5,
 ) -> ExamTemplate:
     """``build_template`` yang divalidasi model pydantic."""

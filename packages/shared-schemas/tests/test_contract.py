@@ -42,7 +42,7 @@ def test_example_parses_into_pydantic_model() -> None:
     template = ExamTemplate.model_validate(load_example())
     assert template.page_width_mm == 210.0
     assert template.page_height_mm == 297.0
-    assert template.column_count == 2
+    assert template.column_count == 3
     assert template.bubble_diameter_mm == 4.5
     assert template.bubble_pitch_mm == 8.5
     assert len(template.fiducials) == 4
