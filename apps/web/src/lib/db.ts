@@ -1,0 +1,200 @@
+/**
+ * Modul IndexedDB Lokal untuk ImtihanOMR / OpenOMR.
+ * Mengelola antrean scan offline (OfflineQueueItem), draft konfigurasi ujian,
+ * data siswa lokal, dan hasil penilaian.
+ */
+
+import { OfflineQueueItem, Student, ExamConfig, GradedStudentRecord } from "@/types/omr";
+
+export const DB_NAME = "imtihan_omr_db";
+export const DB_VERSION = 1;
+
+export const STORES = {
+  QUEUE: "scans_queue",
+  STUDENTS: "students",
+  EXAMS: "exams",
+  GRADES: "grades",
+} as const;
+
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+export function getDB(): Promise<IDBDatabase> {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("IndexedDB hanya tersedia di sisi browser"));
+  }
+
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onupgradeneeded = (event) => {
+        const db = request.result;
+
+        // Store 1: scans_queue (antrean scan offline)
+        if (!db.objectStoreNames.contains(STORES.QUEUE)) {
+          const queueStore = db.createObjectStore(STORES.QUEUE, { keyPath: "id" });
+          queueStore.createIndex("by_status", "status", { unique: false });
+          queueStore.createIndex("by_examId", "examId", { unique: false });
+          queueStore.createIndex("by_createdAt", "createdAt", { unique: false });
+        }
+
+        // Store 2: students (daftar siswa lokal)
+        if (!db.objectStoreNames.contains(STORES.STUDENTS)) {
+          const studentStore = db.createObjectStore(STORES.STUDENTS, { keyPath: "id" });
+          studentStore.createIndex("by_nis", "nis", { unique: true });
+          studentStore.createIndex("by_className", "className", { unique: false });
+        }
+
+        // Store 3: exams (draft konfigurasi ujian)
+        if (!db.objectStoreNames.contains(STORES.EXAMS)) {
+          db.createObjectStore(STORES.EXAMS, { keyPath: "id" });
+        }
+
+        // Store 4: grades (rekap nilai siswa lokal)
+        if (!db.objectStoreNames.contains(STORES.GRADES)) {
+          const gradesStore = db.createObjectStore(STORES.GRADES, { keyPath: "id" });
+          gradesStore.createIndex("by_examId", "examId", { unique: false });
+          gradesStore.createIndex("by_studentId", "studentId", { unique: false });
+        }
+      };
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  return dbPromise;
+}
+
+/* ------------------------------------------------------------------ *
+ * Operasi Antrean Scan Offline (scans_queue)
+ * ------------------------------------------------------------------ */
+
+export async function addToQueue(
+  item: Omit<OfflineQueueItem, "attempts" | "status" | "id" | "createdAt"> & {
+    id?: string;
+    createdAt?: string;
+    attempts?: number;
+    status?: OfflineQueueItem["status"];
+  }
+): Promise<OfflineQueueItem> {
+  const db = await getDB();
+  const queueItem: OfflineQueueItem = {
+    id: item.id || `queue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    examId: item.examId,
+    createdAt: item.createdAt || new Date().toISOString(),
+    thumbnailDataUrl: item.thumbnailDataUrl,
+    imageDataUrl: item.imageDataUrl,
+    status: item.status || "PENDING",
+    attempts: item.attempts ?? 0,
+    lastError: item.lastError,
+  };
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.QUEUE, "readwrite");
+    const store = tx.objectStore(STORES.QUEUE);
+    const req = store.put(queueItem);
+    req.onsuccess = () => resolve(queueItem);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getQueueItems(): Promise<OfflineQueueItem[]> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.QUEUE, "readonly");
+    const store = tx.objectStore(STORES.QUEUE);
+    const req = store.getAll();
+    req.onsuccess = () => {
+      // Urutkan dari yang paling baru
+      const items = (req.result as OfflineQueueItem[]).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      resolve(items);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getQueueItem(id: string): Promise<OfflineQueueItem | undefined> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.QUEUE, "readonly");
+    const store = tx.objectStore(STORES.QUEUE);
+    const req = store.get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function updateQueueItem(item: OfflineQueueItem): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.QUEUE, "readwrite");
+    const store = tx.objectStore(STORES.QUEUE);
+    const req = store.put(item);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deleteQueueItem(id: string): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.QUEUE, "readwrite");
+    const store = tx.objectStore(STORES.QUEUE);
+    const req = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function clearQueue(): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.QUEUE, "readwrite");
+    const store = tx.objectStore(STORES.QUEUE);
+    const req = store.clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Operasi Siswa Lokal (students)
+ * ------------------------------------------------------------------ */
+
+export async function getAllStudents(): Promise<Student[]> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.STUDENTS, "readonly");
+    const store = tx.objectStore(STORES.STUDENTS);
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function saveStudents(students: Student[]): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.STUDENTS, "readwrite");
+    const store = tx.objectStore(STORES.STUDENTS);
+    for (const student of students) {
+      store.put(student);
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function addStudent(student: Student): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.STUDENTS, "readwrite");
+    const store = tx.objectStore(STORES.STUDENTS);
+    const req = store.put(student);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}

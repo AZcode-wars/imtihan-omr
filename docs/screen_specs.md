@@ -388,6 +388,55 @@ Aksi: **Unggah Semua Sekarang** (`primary`, disabled bila kosong), hapus per ite
 
 Auto-upload otomatis saat `navigator.onLine` kembali `true`. Toast sukses: "3 hasil scan tersinkron ke server."
 
+### Spesifikasi Skema IndexedDB (`imtihan_omr_db` v1)
+
+Aplikasi menggunakan IndexedDB peramban lokal untuk memastikan reliabilitas saat offline di ruang kelas tanpa koneksi:
+
+- **Database Name:** `imtihan_omr_db`
+- **Version:** `1`
+
+#### Object Stores & Indeks:
+
+1. **`scans_queue`** (Antrean lembar scan LJK offline)
+   - **Key path:** `id` (string: e.g. `scan-171583021-x8k2`)
+   - **Fields:**
+     - `id: string`
+     - `examId: string`
+     - `createdAt: string` (ISO 8601)
+     - `thumbnailDataUrl: string` (data-url gambar pratinjau thumbnail)
+     - `imageDataUrl: string` (data-url gambar utuh LJK)
+     - `status: "PENDING" | "UPLOADING" | "FAILED"`
+     - `attempts: number` (jumlah percobaan unggah)
+     - `lastError?: string` (pesan kegagalan terakhir)
+   - **Indexes:**
+     - `by_status` on `status` (non-unique)
+     - `by_examId` on `examId` (non-unique)
+     - `by_createdAt` on `createdAt` (non-unique)
+
+2. **`students`** (Daftar siswa & kelas lokal)
+   - **Key path:** `id` (string: e.g. `std-2401`)
+   - **Fields:** `id`, `nis`, `name`, `className`
+   - **Indexes:**
+     - `by_nis` on `nis` (unique)
+     - `by_className` on `className` (non-unique)
+
+3. **`exams`** (Konfigurasi ujian & kunci jawaban aktif)
+   - **Key path:** `id` (string: e.g. `exam-uts-mat-8a`)
+   - **Fields:** `ExamConfig` (judul, KKM, mode pembobotan, soal PG & esai)
+
+4. **`grades`** (Rekap nilai siswa lokal)
+   - **Key path:** `id` (string: e.g. `grade-exam1-std1`)
+   - **Fields:** `GradedStudentRecord` (skor PG, skor esai, nilai akhir, status KKM, payload scan)
+   - **Indexes:**
+     - `by_examId` on `examId` (non-unique)
+     - `by_studentId` on `studentId` (non-unique)
+
+#### Perilaku Sinkronisasi & Retry:
+- Event listener `online` pada window memicu broadcast `trigger-omr-sync`.
+- Setiap item dicoba kirim ke OMR Engine endpoint `POST /v1/scan/json`.
+- Bila engine mengembalikan respons sukses (HTTP 200), item otomatis dihapus dari `scans_queue` dan toast konfirmasi ditampilkan.
+- Bila gagal, status item berubah menjadi `FAILED`, `attempts` bertambah, dan pesan error dicatat untuk retry individual.
+
 ---
 
 ## ⑦ `/grades` — Rekap Nilai

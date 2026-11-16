@@ -1,0 +1,85 @@
+"use client";
+
+import * as React from "react";
+import { getQueueItems } from "@/lib/db";
+
+interface SyncContextType {
+  isOnline: boolean;
+  queueCount: number;
+  refreshQueueCount: () => Promise<void>;
+  triggerSync: () => Promise<void>;
+}
+
+const SyncContext = React.createContext<SyncContextType>({
+  isOnline: true,
+  queueCount: 0,
+  refreshQueueCount: async () => {},
+  triggerSync: async () => {},
+});
+
+export function SyncProvider({ children }: { children: React.ReactNode }) {
+  const [isOnline, setIsOnline] = React.useState<boolean>(true);
+  const [queueCount, setQueueCount] = React.useState<number>(0);
+
+  const refreshQueueCount = React.useCallback(async () => {
+    try {
+      if (typeof window !== "undefined") {
+        const items = await getQueueItems();
+        setQueueCount(items.length);
+      }
+    } catch (err) {
+      console.warn("Gagal membaca antrean:", err);
+    }
+  }, []);
+
+  const triggerSync = React.useCallback(async () => {
+    if (!navigator.onLine) return;
+    try {
+      window.dispatchEvent(new CustomEvent("trigger-omr-sync"));
+      await refreshQueueCount();
+    } catch (err) {
+      console.error("Gagal trigger sync:", err);
+    }
+  }, [refreshQueueCount]);
+
+  React.useEffect(() => {
+    setIsOnline(navigator.onLine);
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      triggerSync();
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    // Initial fetch
+    refreshQueueCount();
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [refreshQueueCount, triggerSync]);
+
+  return (
+    <SyncContext.Provider
+      value={{
+        isOnline,
+        queueCount,
+        refreshQueueCount,
+        triggerSync,
+      }}
+    >
+      {children}
+    </SyncContext.Provider>
+  );
+}
+
+export function useSync() {
+  return React.useContext(SyncContext);
+}
