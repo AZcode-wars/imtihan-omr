@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { ExamTemplate } from "@/types/omr";
+import { ExamConfig, ExamTemplate } from "@/types/omr";
 import { LjkBlueprintSvg } from "@/components/template/ljk-blueprint-svg";
 import { Button } from "@/components/ui/button";
+import { getActiveExam } from "@/lib/db";
+import { buildTemplateFromExam, getStandardA4Template, STANDARD_TOTAL_PG } from "@/lib/template-builder";
 import { toast } from "sonner";
 import {
   Download,
@@ -21,96 +23,64 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Template referensi standar A4 25 PG + 5 Esai (atau 30 PG)
-const DEFAULT_A4_TEMPLATE: ExamTemplate = {
-  id: "tpl-default-a4",
-  examId: "exam-imtihan-uts",
-  pageWidthMm: 210,
-  pageHeightMm: 297,
-  columnCount: 3,
-  bubbleDiameterMm: 4.5,
-  bubblePitchMm: 8.5,
-  fiducials: [
-    { corner: "TOP_LEFT", sizeMm: 14, xMm: 8, yMm: 8 },
-    { corner: "TOP_RIGHT", sizeMm: 10, xMm: 192, yMm: 8 },
-    { corner: "BOTTOM_LEFT", sizeMm: 10, xMm: 8, yMm: 279 },
-    { corner: "BOTTOM_RIGHT", sizeMm: 10, xMm: 192, yMm: 279 },
-  ],
-  nameCropRectMm: { x: 14, y: 30, w: 90, h: 20 },
-  multipleChoiceSlots: Array.from({ length: 30 }, (_, i) => {
-    const qNum = i + 1;
-    // 3 kolom: kolom 1 (1-10), kolom 2 (11-20), kolom 3 (21-30)
-    const colIndex = Math.floor(i / 10);
-    const rowIndex = i % 10;
-    const colX = 14 + colIndex * 64.5;
-    // gap kelompok 5 nomor (+3.5 mm)
-    const groupGap = rowIndex >= 5 ? 3.5 : 0;
-    const rowY = 96 + rowIndex * 8.5 + groupGap;
-
-    return {
-      questionNumber: qNum,
-      xMm: colX,
-      yMm: rowY,
-      options: [
-        { label: "A" as const, xMm: colX + 10, yMm: rowY },
-        { label: "B" as const, xMm: colX + 18.5, yMm: rowY },
-        { label: "C" as const, xMm: colX + 27, yMm: rowY },
-        { label: "D" as const, xMm: colX + 35.5, yMm: rowY },
-      ],
-    };
-  }),
-  essayAreaRectMm: { x: 14, y: 195, w: 176, h: 81 },
-};
-
 export default function TemplateBlueprintPage() {
-  const [template, setTemplate] = React.useState<ExamTemplate>(DEFAULT_A4_TEMPLATE);
+  const [template, setTemplate] = React.useState<ExamTemplate>(() => getStandardA4Template());
+  const [examConfig, setExamConfig] = React.useState<ExamConfig | null>(null);
   const [showGrid, setShowGrid] = React.useState(false);
   const [showMargins, setShowMargins] = React.useState(true);
   const [zoom, setZoom] = React.useState(1.0);
   const [activeTab, setActiveTab] = React.useState<"svg" | "raster">("svg");
 
-  // Muat data template dari file JSON jika ada
+  // Muat data template standar & konfigurasi ujian aktif dari IndexedDB
   React.useEffect(() => {
-    fetch("/template.json")
-      .then((res) => {
-        if (res.ok) return res.json();
-        return null;
-      })
-      .then((data) => {
-        if (data && data.multipleChoiceSlots) {
-          setTemplate(data);
+    async function loadTemplate() {
+      try {
+        const active = await getActiveExam();
+        if (active) {
+          setExamConfig(active);
+          setTemplate(getStandardA4Template(active.id));
+        } else {
+          setTemplate(getStandardA4Template());
         }
-      })
-      .catch(() => {
-        // Fallback ke default template
-      });
+      } catch (err) {
+        console.warn("Gagal memuat template ujian aktif:", err);
+      }
+    }
+    loadTemplate();
   }, []);
 
   const handleDownloadPdf = () => {
     const link = document.createElement("a");
     link.href = "/sheet.pdf";
-    link.download = "LJK_ImtihanOMR_A4.pdf";
+    link.download = "LJK_STANDAR_A4_30PG.pdf";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success("Mengunduh LJK_ImtihanOMR_A4.pdf");
+    toast.success("Mengunduh berkas PDF cetak LJK standar A4 (30 PG + Esai)");
   };
 
   const handleDownloadJson = () => {
+    // Ekspor template pemindaian aktif yang dikirim ke engine OMR
+    const activeScanTemplate = buildTemplateFromExam(examConfig);
     const dataStr =
-      "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(template, null, 2));
+      "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(activeScanTemplate, null, 2));
     const downloadAnchor = document.createElement("a");
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `template-${template.id}.json`);
+    downloadAnchor.setAttribute("download", `template-${activeScanTemplate.id}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-    toast.success("Metadata template.json diunduh");
+    toast.success(`Metadata template-${activeScanTemplate.id}.json berhasil diunduh`);
   };
 
   const handlePrint = () => {
     window.print();
   };
+
+  const activePgCount = examConfig?.multipleChoiceQuestions?.length ?? 30;
+  const activeEssayCount = examConfig?.essayQuestions?.length ?? 5;
+  const totalSlotsCount = template.multipleChoiceSlots.length; // selalu 30 di lembar cetak standar
+  const rowsPerCol = Math.ceil(totalSlotsCount / (template.columnCount || 3));
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -122,11 +92,11 @@ export default function TemplateBlueprintPage() {
               Blueprint LJK A4
             </h1>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-200">
-              Presisi 1 : 1.414 (A4)
+              {activePgCount} PG + {activeEssayCount} Esai
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-1">
-            Pratinjau akurat tata letak LJK asli, verifikasi koordinat fiducial & bubble, dan cetak PDF.
+            Lembar cetak fisik berformat standar 30 nomor PG. Engine OMR otomatis hanya membaca nomor 1 sampai {activePgCount} sesuai ujian aktif ({examConfig?.title || "Ujian Aktif"} - {examConfig?.className || "Kelas 8A"}).
           </p>
         </div>
 
@@ -150,43 +120,43 @@ export default function TemplateBlueprintPage() {
         </div>
       </div>
 
-      {/* Main Grid View */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        {/* Left / Center: Interactive Sheet Canvas (3 cols) */}
-        <div className="lg:col-span-3 bg-slate-100 rounded-2xl border border-slate-200 p-4 md:p-8 flex flex-col items-center min-h-[850px] relative overflow-hidden print-sheet-container">
-          {/* Canvas Floating Toolbar */}
-          <div className="w-full flex flex-wrap items-center justify-between gap-3 mb-6 bg-white/95 backdrop-blur-xs p-2.5 rounded-xl border border-slate-200 shadow-xs print-hide">
-            {/* View Mode Switcher Ringkas */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+      {/* Main Grid: Blueprint Canvas (2 cols) & Properties Inspector (1 col) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Left / Center: Interactive SVG & Controls (2 cols) */}
+        <div className="lg:col-span-2 bg-slate-50 border border-slate-200/90 rounded-2xl overflow-hidden shadow-inner flex flex-col">
+          {/* Canvas Toolbar Controls */}
+          <div className="bg-white border-b border-slate-200/80 px-4 py-3 flex flex-wrap items-center justify-between gap-2 print-hide">
+            {/* View Switcher */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/60">
               <button
                 type="button"
                 onClick={() => setActiveTab("svg")}
                 className={cn(
-                  "px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  "px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer",
                   activeTab === "svg"
-                    ? "bg-white text-slate-800 shadow-xs"
-                    : "text-slate-500 hover:text-slate-800"
+                    ? "bg-white text-brand-700 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                Vektor
+                Vektor SVG (Dinamis)
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("raster")}
                 className={cn(
-                  "px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  "px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer",
                   activeTab === "raster"
-                    ? "bg-white text-slate-800 shadow-xs"
-                    : "text-slate-500 hover:text-slate-800"
+                    ? "bg-white text-brand-700 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                PNG
+                Raster Asli (Engine)
               </button>
             </div>
 
-            {/* Toggle Controls */}
+            {/* Toggle Overlay Helpers */}
             {activeTab === "svg" && (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -258,6 +228,7 @@ export default function TemplateBlueprintPage() {
                 showGrid={showGrid}
                 showMargins={showMargins}
                 zoom={zoom}
+                activePgCount={activePgCount}
               />
             ) : (
               <div
@@ -307,14 +278,16 @@ export default function TemplateBlueprintPage() {
             </div>
           </div>
 
-          {/* Card 2: Tata Letak Bubble OMR */}
+          {/* Card 2: Tata Letak Soal Dinamis */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
             <h3 className="font-bold text-sm text-slate-800 mb-3">Tata Letak Soal</h3>
 
             <div className="space-y-2.5 text-xs divide-y divide-slate-100">
               <div className="flex justify-between items-center pt-2">
                 <span className="text-slate-500">Jumlah Kolom PG</span>
-                <span className="font-bold text-slate-800">3 Kolom (10/kolom)</span>
+                <span className="font-bold text-slate-800">
+                  {template.columnCount} Kolom ({rowsPerCol} baris/kolom)
+                </span>
               </div>
               <div className="flex justify-between items-center pt-2">
                 <span className="text-slate-500">Diameter Bubble</span>
@@ -329,11 +302,23 @@ export default function TemplateBlueprintPage() {
                 <span className="font-mono font-medium text-slate-800">+3.5 mm</span>
               </div>
               <div className="flex justify-between items-center pt-2">
-                <span className="text-slate-500">Total Soal PG Aktif</span>
+                <span className="text-slate-500">Format Lembar Fisik</span>
+                <span className="font-bold text-slate-800">Standar 30 PG (Cetak Tetap)</span>
+              </div>
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-slate-500">Nomor Aktif Dinilai</span>
                 <span className="font-bold text-brand-700">
-                  {template.multipleChoiceSlots.length} Butir
+                  {activePgCount} Butir (No. 01-{activePgCount})
                 </span>
               </div>
+              {activePgCount < 30 && (
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-slate-500">Nomor {activePgCount + 1}-30</span>
+                  <span className="font-mono text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-[11px]">
+                    Diabaikan Engine
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -358,8 +343,8 @@ export default function TemplateBlueprintPage() {
                 <span className="text-slate-500">Dimensi Zona Esai</span>
                 <span className="font-mono font-medium text-slate-800">
                   {template.essayAreaRectMm
-                    ? `${template.essayAreaRectMm.w} × ${template.essayAreaRectMm.h} mm`
-                    : "Tidak ada"}
+                    ? `${template.essayAreaRectMm.w} × ${template.essayAreaRectMm.h} mm (${activeEssayCount} Soal)`
+                    : "Tidak ada (0 Esai)"}
                 </span>
               </div>
             </div>

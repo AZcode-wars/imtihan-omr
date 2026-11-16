@@ -21,7 +21,8 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { calculateFinalGrade, formatFinalScore } from "@/lib/scoring";
+import { calculateFinalGrade, formatFinalScore, type EssayMarkResult, type McQuestionResult } from "@/lib/scoring";
+import { buildTemplateFromExam } from "@/lib/template-builder";
 
 export interface BatchItem {
   id: string;
@@ -143,14 +144,8 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
     if (items.length === 0 || isProcessingAll) return;
     setIsProcessingAll(true);
 
-    // Ambil metadata template A4 (dari template.json)
-    let templateMeta: any = null;
-    try {
-      const resTpl = await fetch("/template.json");
-      if (resTpl.ok) templateMeta = await resTpl.json();
-    } catch {
-      // ignore
-    }
+    // Bangun metadata template dari konfigurasi ujian aktif
+    const templateMeta = buildTemplateFromExam(examConfig);
 
     const updated = [...items];
     for (let i = 0; i < updated.length; i++) {
@@ -242,37 +237,63 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeTab, items.length]);
 
-  // Perhitungan Nilai Live Lembar Aktif (Cocokkan dengan Kunci Jawaban Ujian Aktif)
+  // Perhitungan Nilai Live Lembar Aktif (Cocokkan dengan Kunci Jawaban Ujian Aktif & Aturan Scoring)
   const calculateScore = (scan?: OMRScanResponse) => {
-    if (!scan) return { grade: 0, validCount: 0, correctCount: 0, totalCount: activePgCount };
-
-    // Kunci jawaban dari konfigurasi ujian aktif
     const mcConfig = examConfig?.multipleChoiceQuestions || [];
+    const essayConfig = examConfig?.essayQuestions || [];
 
-    // Hitung jumlah jawaban yang terisi valid dan yang benar sesuai kunci
+    const mcQuestions: McQuestionResult[] = mcConfig.map((q) => {
+      const ans = scan?.mcAnswers?.find((a) => a.questionNumber === q.number);
+      const selectedOption = ans && ans.status === "VALID" ? ans.selectedOption : null;
+      return {
+        number: q.number,
+        correctAnswer: q.correctAnswer,
+        selectedOption: (selectedOption as any) || null,
+        pointsCorrect: q.pointsCorrect ?? 1,
+        pointsWrong: q.pointsWrong ?? 0,
+        status: q.status ?? "ACTIVE",
+      };
+    });
+
+    const essayQuestions: EssayMarkResult[] = essayConfig.map((eq) => ({
+      number: eq.number,
+      maxScore: eq.maxScore ?? 10,
+      outcome: "INCORRECT",
+    }));
+
+    const scoringRes = calculateFinalGrade({
+      mode: examConfig?.scoringMode ?? "MODE_A_PERCENTAGE",
+      rounding: examConfig?.rounding ?? "ROUND_HALF_UP",
+      mcQuestions,
+      essayQuestions,
+      weights: examConfig?.sectionWeights,
+    });
+
     let correctCount = 0;
     let validCount = 0;
 
-    scan.mcAnswers.forEach((ans) => {
+    scan?.mcAnswers?.forEach((ans) => {
       if (ans.status === "VALID") {
         validCount++;
         const configItem = mcConfig.find((q) => q.number === ans.questionNumber);
-        const correctKey = configItem?.correctAnswer;
-        if (correctKey && ans.selectedOption === correctKey) {
+        if (configItem?.correctAnswer && ans.selectedOption === configItem.correctAnswer) {
           correctCount++;
         }
       }
     });
 
-    const denominator = scan.mcAnswers.length > 0 ? scan.mcAnswers.length : activePgCount;
-    // Nilai = (Jawaban Benar / Total Soal) * 100
-    const grade = Math.round((correctCount / (denominator || 1)) * 100);
+    const totalCount = mcConfig.length > 0 ? mcConfig.length : activePgCount;
 
     return {
-      grade,
+      grade: scoringRes.finalGrade,
+      formattedGrade: formatFinalScore(scoringRes),
+      scale: scoringRes.scale,
+      totalPossiblePoints: scoringRes.totalPossiblePoints,
       validCount,
       correctCount,
-      totalCount: denominator,
+      totalCount,
+      rawScore: scoringRes.rawScore,
+      scoringRes,
     };
   };
 
@@ -662,27 +683,41 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                     ) : (
                       <>
                         {/* Ringkasan Skor Live */}
-                        <div className="p-4 rounded-xl bg-gradient-to-br from-brand-50 to-emerald-50/40 border border-brand-200">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <span className="text-xs font-bold text-brand-900 uppercase tracking-wider block">
-                                NILAI AKHIR
-                              </span>
-                              <span className="text-[11px] text-brand-700 font-medium">
-                                {calculateScore(selectedItem.scanResult).correctCount} Benar dari {calculateScore(selectedItem.scanResult).totalCount} Soal
-                              </span>
+                        {(() => {
+                          const scoreInfo = calculateScore(selectedItem.scanResult);
+                          const isModeB = examConfig?.scoringMode === "MODE_B_DIRECT_POINTS";
+                          return (
+                            <div className="p-4 rounded-xl bg-gradient-to-br from-brand-50 to-emerald-50/40 border border-brand-200">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <span className="text-xs font-bold text-brand-900 uppercase tracking-wider block">
+                                    NILAI AKHIR {isModeB ? "(Mode B: Poin)" : "(Mode A: Skala 0-100)"}
+                                  </span>
+                                  <span className="text-[11px] text-brand-700 font-medium">
+                                    {scoreInfo.correctCount} Benar dari {scoreInfo.totalCount} Soal PG
+                                    {isModeB && ` · ${scoreInfo.scoringRes.mcPoints} / ${scoreInfo.scoringRes.mcMaxPoints} Poin`}
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-3xl font-bold font-mono text-brand-800">
+                                    {scoreInfo.grade}
+                                  </span>
+                                  {isModeB && (
+                                    <span className="text-[10px] text-brand-700 block font-mono">
+                                      / {scoreInfo.totalPossiblePoints} poin
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="mt-2 pt-2 border-t border-brand-200/60 flex items-center justify-between text-[11px] text-brand-800">
+                                <span>Status Pengisian LJK:</span>
+                                <span className="font-semibold">
+                                  {scoreInfo.validCount} / {scoreInfo.totalCount} Terisi Valid
+                                </span>
+                              </div>
                             </div>
-                            <span className="text-3xl font-bold font-mono text-brand-800">
-                              {calculateScore(selectedItem.scanResult).grade}
-                            </span>
-                          </div>
-                          <div className="mt-2 pt-2 border-t border-brand-200/60 flex items-center justify-between text-[11px] text-brand-800">
-                            <span>Status Pengisian LJK:</span>
-                            <span className="font-semibold">
-                              {calculateScore(selectedItem.scanResult).validCount} / {calculateScore(selectedItem.scanResult).totalCount} Terisi Valid
-                            </span>
-                          </div>
-                        </div>
+                          );
+                        })()}
 
                         {/* Rincian Jawaban Siswa vs Kunci */}
                         <div>
@@ -804,12 +839,12 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                         examId: examConfig?.id || "exam-1",
                         studentId: student.id,
                         studentName: student.name,
-                        rawMCScore: score.correctCount,
-                        maxMCScore: score.totalCount,
-                        rawEssayScore: 0,
-                        maxEssayScore: 0,
+                        rawMCScore: score.scoringRes.mcPoints,
+                        maxMCScore: score.scoringRes.mcMaxPoints,
+                        rawEssayScore: score.scoringRes.essayPoints,
+                        maxEssayScore: score.scoringRes.essayMaxPoints,
                         finalGrade: score.grade,
-                        totalPossiblePoints: score.totalCount,
+                        totalPossiblePoints: score.totalPossiblePoints,
                         verifiedAt: new Date().toISOString(),
                         scanPayload,
                       };

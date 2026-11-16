@@ -10,6 +10,7 @@ import { addToQueue, getActiveExam, getAllStudents, saveGradeRecord } from "@/li
 import { useSync } from "@/lib/sync-context";
 import { resizeImageFile } from "@/lib/image-utils";
 import { ExamConfig, GradedStudentRecord, OMRScanResponse, Student } from "@/types/omr";
+import { buildTemplateFromExam } from "@/lib/template-builder";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -164,32 +165,14 @@ export default function ScanPage() {
         toast.info("Offline: Foto scan disimpan di Antrean IndexedDB.");
       }
 
-      // Ambil metadata template jika ada
-      let templatePayload: any = null;
-      try {
-        const tplRes = await fetch("/template.json");
-        if (tplRes.ok) templatePayload = await tplRes.json();
-      } catch {
-        // ignore
-      }
+      // Bangun metadata template dinamis dari ujian aktif
+      const templatePayload = buildTemplateFromExam(examConfig);
 
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          template: templatePayload || {
-            id: "tpl-default-a4",
-            examId: examConfig?.id || "exam-1",
-            pageWidthMm: 210,
-            pageHeightMm: 297,
-            columnCount: 3,
-            bubbleDiameterMm: 4.5,
-            bubblePitchMm: 8.5,
-            fiducials: [],
-            nameCropRectMm: { x: 14, y: 30, w: 90, h: 20 },
-            multipleChoiceSlots: [],
-            essayAreaRectMm: { x: 14, y: 194, w: 176, h: 84 },
-          },
+          template: templatePayload,
           imageDataUrl,
           sourceDevice: "MOBILE_CAMERA",
         }),

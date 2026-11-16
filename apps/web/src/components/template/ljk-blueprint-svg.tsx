@@ -10,6 +10,7 @@ export interface LjkBlueprintSvgProps {
   showMargins?: boolean;
   zoom?: number;
   className?: string;
+  activePgCount?: number;
 }
 
 /**
@@ -23,6 +24,7 @@ export function LjkBlueprintSvg({
   showMargins = true,
   zoom = 1,
   className,
+  activePgCount,
 }: LjkBlueprintSvgProps) {
   const {
     pageWidthMm = 210,
@@ -302,47 +304,55 @@ export function LjkBlueprintSvg({
         </text>
 
         {/* 9. Bubble Slots Pilihan Ganda */}
-        {multipleChoiceSlots.map((slot) => (
-          <g key={`slot-${slot.questionNumber}`}>
-            {/* Nomor Soal */}
-            <text
-              x={slot.xMm + 4}
-              y={slot.yMm + 1.2}
-              textAnchor="end"
-              fontSize="2.3"
-              fontWeight="bold"
-              fontFamily="Roboto, sans-serif"
-              fill="#1e293b"
+        {multipleChoiceSlots.map((slot) => {
+          const isSlotActive = activePgCount === undefined || slot.questionNumber <= activePgCount;
+          return (
+            <g
+              key={`slot-${slot.questionNumber}`}
+              opacity={isSlotActive ? 1 : 0.35}
+              className={isSlotActive ? undefined : "select-none"}
             >
-              {String(slot.questionNumber).padStart(2, "0")}
-            </text>
+              {/* Nomor Soal */}
+              <text
+                x={slot.xMm + 4}
+                y={slot.yMm + 1.2}
+                textAnchor="end"
+                fontSize="2.3"
+                fontWeight="bold"
+                fontFamily="Roboto, sans-serif"
+                fill={isSlotActive ? "#1e293b" : "#94a3b8"}
+              >
+                {String(slot.questionNumber).padStart(2, "0")}
+              </text>
 
-            {/* Pilihan Opsi A, B, C, D */}
-            {slot.options.map((opt) => (
-              <g key={`opt-${slot.questionNumber}-${opt.label}`}>
-                <circle
-                  cx={opt.xMm}
-                  cy={opt.yMm}
-                  r="2.25"
-                  fill="#ffffff"
-                  stroke="#1e293b"
-                  strokeWidth="0.35"
-                />
-                <text
-                  x={opt.xMm}
-                  y={opt.yMm + 0.9}
-                  textAnchor="middle"
-                  fontSize="2.0"
-                  fontWeight="bold"
-                  fontFamily="Roboto, sans-serif"
-                  fill="#1e293b"
-                >
-                  {opt.label}
-                </text>
-              </g>
-            ))}
-          </g>
-        ))}
+              {/* Pilihan Opsi A, B, C, D */}
+              {slot.options.map((opt) => (
+                <g key={`opt-${slot.questionNumber}-${opt.label}`}>
+                  <circle
+                    cx={opt.xMm}
+                    cy={opt.yMm}
+                    r="2.25"
+                    fill="#ffffff"
+                    stroke={isSlotActive ? "#1e293b" : "#94a3b8"}
+                    strokeWidth="0.35"
+                    strokeDasharray={isSlotActive ? undefined : "0.8,0.8"}
+                  />
+                  <text
+                    x={opt.xMm}
+                    y={opt.yMm + 0.9}
+                    textAnchor="middle"
+                    fontSize="2.0"
+                    fontWeight="bold"
+                    fontFamily="Roboto, sans-serif"
+                    fill={isSlotActive ? "#1e293b" : "#94a3b8"}
+                  >
+                    {opt.label}
+                  </text>
+                </g>
+              ))}
+            </g>
+          );
+        })}
 
         {/* 10. Zona Jawaban Esai */}
         {essayAreaRectMm && (
