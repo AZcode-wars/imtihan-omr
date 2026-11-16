@@ -86,18 +86,34 @@ def classify_mc_slot(
     option_fill_ratios: dict[OptionLabel, float],
     question_number: int,
 ) -> DetectedMCAnswer:
-    """Klasifikasi jawaban satu nomor PG berdasarkan fill ratio masing-masing opsi."""
-    # Opsi-opsi yang di atas batas kosong
-    filled_options = [
-        (opt, ratio) for opt, ratio in option_fill_ratios.items() if ratio >= EMPTY_THRESHOLD
-    ]
+    """Klasifikasi jawaban satu nomor PG berdasarkan fill ratio masing-masing opsi.
 
-    # Kasus 1: Tidak ada yang terisi (semua < EMPTY_THRESHOLD)
-    if not filled_options:
-        # Cari rasio tertinggi sebagai referensi
-        max_ratio = max(option_fill_ratios.values()) if option_fill_ratios else 0.0
-        # Confidence bahwa memang benar-benar kosong: 1.0 - (max_ratio / EMPTY_THRESHOLD)
-        conf = max(0.0, min(1.0, 1.0 - (max_ratio / EMPTY_THRESHOLD)))
+    Menggunakan kombinasi relative contrast (margin terhadap opsi lain dalam baris)
+    dan absolute thresholding agar tahan terhadap variasi pencahayaan kamera dan noise cetak.
+    """
+    if not option_fill_ratios:
+        return DetectedMCAnswer(
+            questionNumber=question_number,
+            selectedOption=None,
+            status="EMPTY",
+            confidence=1.0,
+            rawCandidates=None,
+        )
+
+    # Urutkan berdasarkan rasio tertinggi menurun
+    sorted_opts = sorted(option_fill_ratios.items(), key=lambda x: x[1], reverse=True)
+    top_opt, top_val = sorted_opts[0]
+    runner_opt, runner_val = sorted_opts[1] if len(sorted_opts) > 1 else (top_opt, 0.0)
+    min_val = sorted_opts[-1][1]
+
+    margin = top_val - runner_val
+    spread = top_val - min_val
+
+    # Kasus 1: Baris Kosong (EMPTY)
+    # Berlaku jika nilai tertinggi di bawah batas kosong minimal ATAU
+    # seluruh opsi nilainya seragam (spread kecil = noise cetak/bayangan merata pada kertas)
+    if top_val < EMPTY_THRESHOLD or (spread < 0.12 and top_val < 0.38):
+        conf = max(0.0, min(1.0, 1.0 - (top_val / 0.30)))
         return DetectedMCAnswer(
             questionNumber=question_number,
             selectedOption=None,
@@ -106,48 +122,39 @@ def classify_mc_slot(
             rawCandidates=None,
         )
 
-    # Urutkan berdasarkan rasio tertinggi menurun
-    sorted_filled = sorted(filled_options, key=lambda x: x[1], reverse=True)
-    top_opt, top_ratio = sorted_filled[0]
-
-    # Opsi yang dianggap berniat diarsir (rasio >= LOW_CONF_THRESHOLD)
-    significant_opts = [opt for opt, ratio in sorted_filled if ratio >= LOW_CONF_THRESHOLD]
-
     # Kasus 2: Jawaban Ganda (MULTIPLE)
-    if len(significant_opts) > 1:
-        # Confidence bahwa ada anomali ganda
-        conf = round(min(1.0, (sorted_filled[1][1] / top_ratio)), 3)
+    # Ada dua atau lebih opsi yang sama-sama diarsir tebal dan selisihnya tipis
+    if runner_val >= 0.38 and margin < 0.12:
+        conf = round(min(1.0, runner_val / top_val), 3)
+        significant_cands = [
+            opt for opt, val in sorted_opts if val >= 0.38 or (top_val - val) < 0.12
+        ]
         return DetectedMCAnswer(
             questionNumber=question_number,
             selectedOption=None,
             status="MULTIPLE",
             confidence=conf,
-            rawCandidates=[opt for opt, _ in sorted_filled if _ >= LOW_CONF_THRESHOLD],
+            rawCandidates=significant_cands,
         )
 
-    # Kasus 3: Arsiran Ragu / Tipis (LOW_CONFIDENCE)
-    if top_ratio < FILLED_THRESHOLD:
-        # Di antara EMPTY_THRESHOLD dan FILLED_THRESHOLD
-        # Nilai confidence rendah
-        conf = round(top_ratio / FILLED_THRESHOLD, 3)
+    # Kasus 3: Jawaban Solid & Mantap (VALID)
+    # Opsi teratas tebal (>= 0.48) dan memiliki margin kontras yang jelas terhadap opsi lain
+    if top_val >= 0.48 and margin >= 0.15:
+        conf = round(min(1.0, 0.70 + 0.30 * (margin / top_val)), 3)
         return DetectedMCAnswer(
             questionNumber=question_number,
             selectedOption=top_opt,
-            status="LOW_CONFIDENCE",
+            status="VALID",
             confidence=conf,
             rawCandidates=[top_opt],
         )
 
-    # Kasus 4: Tepat satu opsi valid dan tebal (VALID)
-    # Bandingkan dengan runner-up (jika ada) untuk mengukur kemantapan (margin)
-    runner_up_ratio = sorted_filled[1][1] if len(sorted_filled) > 1 else 0.0
-    margin = top_ratio - runner_up_ratio
-    conf = round(min(1.0, 0.70 + 0.30 * (margin / top_ratio)), 3)
-
+    # Kasus 4: Arsiran Ragu / Tipis / Ada Bekas Penghapusan (LOW_CONFIDENCE)
+    conf = round(max(0.30, min(0.69, top_val / FILLED_THRESHOLD)), 3)
     return DetectedMCAnswer(
         questionNumber=question_number,
         selectedOption=top_opt,
-        status="VALID",
+        status="LOW_CONFIDENCE",
         confidence=conf,
         rawCandidates=[top_opt],
     )

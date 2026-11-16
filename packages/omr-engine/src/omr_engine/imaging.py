@@ -283,8 +283,10 @@ def binarize_for_inspection(image: np.ndarray) -> np.ndarray:
         gray = image.copy()
 
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    # Gunakan blockSize=35 (lebih besar dari diameter bulatan ~18px)
+    # agar bagian tengah arsiran solid pensil tidak terkikis/bolong saat difoto kamera.
     thresh = cv2.adaptiveThreshold(
-        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 21, 10
+        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 35, 10
     )
     return thresh
 
