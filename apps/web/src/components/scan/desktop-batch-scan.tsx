@@ -497,10 +497,10 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                         </p>
                         <p className="text-[10px] text-slate-400 truncate">
                           {assignedStudent
-                            ? `${assignedStudent.nis} · 8A`
+                            ? `${assignedStudent.nis} · ${item.filename}`
                             : item.file
-                            ? `${(item.file.size / 1024).toFixed(0)} KB · Belum ada siswa`
-                            : "Belum dicocokkan siswa"}
+                            ? `${(item.file.size / 1024).toFixed(0)} KB · Menunggu pemilihan siswa`
+                            : "Menunggu pemilihan siswa"}
                         </p>
                       </div>
                     </div>

@@ -30,9 +30,9 @@ export function AppHeader({
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold tracking-tight text-white leading-tight">
+            <span className="text-base font-bold tracking-tight text-white leading-tight">
               ImtihanOMR
-            </h1>
+            </span>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-700 text-brand-200 border border-brand-500/30 leading-none">
               MVP
             </span>

@@ -43,17 +43,19 @@ export function Stepper({
           type="button"
           onClick={handleDecrement}
           disabled={value <= min}
+          aria-label={`Kurangi ${label}`}
           className="w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs"
         >
           −
         </button>
-        <span className="w-12 text-center text-xl font-bold tabular-nums text-slate-800">
+        <span className="w-12 text-center text-xl font-bold tabular-nums text-slate-800" aria-live="polite">
           {value}
         </span>
         <button
           type="button"
           onClick={handleIncrement}
           disabled={value >= max}
+          aria-label={`Tambah ${label}`}
           className="w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs"
         >
           +

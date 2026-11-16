@@ -7,9 +7,11 @@ import {
   deleteQueueItem,
   clearQueue,
   addToQueue,
+  getActiveExam,
 } from "@/lib/db";
 import { useSync } from "@/lib/sync-context";
 import { OfflineQueueItem } from "@/types/omr";
+import { buildTemplateFromExam } from "@/lib/template-builder";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -52,47 +54,59 @@ export default function QueuePage() {
     loadItems();
   }, [loadItems]);
 
-  // Sync single item ke OMR Engine
-  const syncItem = async (item: OfflineQueueItem): Promise<boolean> => {
+  // Sync single item ke OMR Engine via Next.js API route
+  const syncItem = async (item: OfflineQueueItem): Promise<{ ok: boolean; error?: string }> => {
     try {
       // Tandai UPLOADING
       await updateQueueItem({ ...item, status: "UPLOADING", attempts: item.attempts + 1 });
       await loadItems();
 
-      // Coba kirim ke OMR Engine API
-      const res = await fetch("http://localhost:8000/v1/scan/json", {
+      // Ambil konfigurasi ujian aktif untuk membuat template standar yang valid
+      const activeExam = await getActiveExam();
+      const template = buildTemplateFromExam(activeExam);
+
+      const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          template: {
-            id: "tpl-1",
-            examId: item.examId || "exam-1",
-            pageWidthMm: 210,
-            pageHeightMm: 297,
-            fiducials: [],
-            multipleChoiceSlots: [],
-          },
+          template,
           imageDataUrl: item.imageDataUrl,
+          sourceDevice: "MOBILE_CAMERA",
         }),
       });
 
       if (!res.ok) {
-        throw new Error(`Engine HTTP ${res.status}`);
+        let errorDetail = `HTTP ${res.status}`;
+        try {
+          const errJson = await res.json();
+          errorDetail = errJson.error || errJson.detail || errorDetail;
+        } catch {
+          // ignore
+        }
+
+        if (res.status === 400 || res.status === 422) {
+          throw new Error(`Citra tidak valid / 4 sudut fiducial tidak ditemukan (${errorDetail})`);
+        } else if (res.status === 503) {
+          throw new Error("Engine OMR tidak dapat dijangkau (503). Pastikan Engine OMR aktif.");
+        } else {
+          throw new Error(`Engine OMR gagal memproses: ${errorDetail}`);
+        }
       }
 
       // Berhasil diproses oleh engine -> hapus dari antrean offline
       await deleteQueueItem(item.id);
-      return true;
-    } catch (err) {
-      console.warn(`Sinkronisasi gagal untuk item ${item.id}:`, err);
-      // Update FAILED dengan catatan error
+      return { ok: true };
+    } catch (err: any) {
+      const errMsg = err instanceof Error ? err.message : "Koneksi engine gagal";
+      console.warn(`Sinkronisasi gagal untuk item ${item.id}:`, errMsg);
+      // Update FAILED dengan catatan error yang spesifik dan akurat
       await updateQueueItem({
         ...item,
         status: "FAILED",
         attempts: item.attempts + 1,
-        lastError: err instanceof Error ? err.message : "Koneksi engine gagal",
+        lastError: errMsg,
       });
-      return false;
+      return { ok: false, error: errMsg };
     }
   };
 
@@ -103,14 +117,17 @@ export default function QueuePage() {
     setSyncProgress({ current: 0, total: items.length });
 
     let successCount = 0;
+    let lastError = "";
     const currentList = [...items];
 
     for (let i = 0; i < currentList.length; i++) {
       const item = currentList[i];
       setSyncProgress({ current: i + 1, total: currentList.length });
-      const ok = await syncItem(item);
-      if (ok) {
+      const res = await syncItem(item);
+      if (res.ok) {
         successCount++;
+      } else if (res.error) {
+        lastError = res.error;
       }
     }
 
@@ -121,7 +138,7 @@ export default function QueuePage() {
     if (successCount > 0) {
       toast.success(`${successCount} hasil scan tersinkron ke server.`);
     } else {
-      toast.error("Semua antrean gagal disinkronkan. Pastikan Engine OMR aktif.");
+      toast.error(lastError || "Semua antrean gagal disinkronkan. Periksa format citra atau status Engine OMR.");
     }
   };
 

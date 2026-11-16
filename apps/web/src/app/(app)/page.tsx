@@ -190,8 +190,11 @@ export default function SetupPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2 space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Nama / Judul Ujian</label>
+            <label htmlFor="exam-title-input" className="text-xs font-bold text-slate-700">
+              Nama / Judul Ujian
+            </label>
             <input
+              id="exam-title-input"
               type="text"
               value={examTitle}
               onChange={(e) => setExamTitle(e.target.value)}
@@ -201,8 +204,11 @@ export default function SetupPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Kelas</label>
+            <label htmlFor="class-name-input" className="text-xs font-bold text-slate-700">
+              Kelas
+            </label>
             <input
+              id="class-name-input"
               type="text"
               value={classNameVal}
               onChange={(e) => setClassNameVal(e.target.value)}
@@ -212,13 +218,17 @@ export default function SetupPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">KKM (Kriteria Ketuntasan Minimal)</label>
+            <label htmlFor="passing-score-input" className="text-xs font-bold text-slate-700">
+              KKM (Kriteria Ketuntasan Minimal)
+            </label>
             <input
+              id="passing-score-input"
               type="number"
               value={passingScore}
               onChange={(e) => setPassingScore(Number(e.target.value))}
               min={0}
               max={100}
+              aria-label="KKM (Kriteria Ketuntasan Minimal)"
               className="w-full h-11 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition-all font-bold tabular-nums text-brand-800"
             />
           </div>
@@ -279,11 +289,13 @@ export default function SetupPage() {
               <span className="text-amber-700">Bobot Esai: {weightEssay}%</span>
             </div>
             <input
+              id="weight-slider"
               type="range"
               min={0}
               max={100}
               step={5}
               value={weightPg}
+              aria-label="Bobot Pilihan Ganda (Persen)"
               onChange={handleSliderChange}
               className="w-full accent-brand-700 cursor-pointer h-2 bg-slate-200 rounded-lg"
             />
@@ -296,24 +308,32 @@ export default function SetupPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-600">Poin per PG Benar</label>
+              <label htmlFor="points-per-pg-input" className="text-xs font-bold text-slate-600">
+                Poin per PG Benar
+              </label>
               <input
+                id="points-per-pg-input"
                 type="number"
                 value={pointsPerPg}
                 onChange={(e) => setPointsPerPg(Number(e.target.value))}
                 min={0.5}
                 step={0.5}
+                aria-label="Poin per PG Benar"
                 className="w-full h-10 px-3 text-sm rounded-lg border border-slate-200 bg-white font-bold tabular-nums"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-600">Poin Maks per Soal Esai</label>
+              <label htmlFor="max-score-per-essay-input" className="text-xs font-bold text-slate-600">
+                Poin Maks per Soal Esai
+              </label>
               <input
+                id="max-score-per-essay-input"
                 type="number"
                 value={maxScorePerEssay}
                 onChange={(e) => setMaxScorePerEssay(Number(e.target.value))}
                 min={1}
                 max={50}
+                aria-label="Poin Maks per Soal Esai"
                 className="w-full h-10 px-3 text-sm rounded-lg border border-slate-200 bg-white font-bold tabular-nums"
               />
             </div>

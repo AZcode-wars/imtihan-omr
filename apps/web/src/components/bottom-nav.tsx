@@ -48,6 +48,7 @@ export function BottomNav({ queueCount = 0, className }: BottomNavProps) {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label || "Scan LJK"}
               className="flex flex-col items-center justify-center min-w-[68px] -mt-5 group"
             >
               <div
@@ -60,6 +61,7 @@ export function BottomNav({ queueCount = 0, className }: BottomNavProps) {
               >
                 <Icon className="w-7 h-7 stroke-[2.2]" />
               </div>
+              <span className="sr-only">{item.label}</span>
             </Link>
           );
         }

@@ -114,18 +114,29 @@ export default function StudentsPage() {
     reader.onload = async (event) => {
       const text = event.target?.result as string;
       const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-      if (lines.length <= 1) {
-        toast.error("Berkas CSV kosong atau tidak memiliki baris data.");
+      if (lines.length === 0) {
+        toast.error("Berkas CSV kosong.");
+        return;
+      }
+
+      // Deteksi otomatis apakah baris pertama adalah judul kolom / header
+      const firstLineParts = lines[0].split(",").map((p) => p.replace(/^"|"$/g, "").trim().toLowerCase());
+      const isHeaderRow =
+        firstLineParts.some((p) => p.includes("nis") || p.includes("nomor") || p.includes("no") || p === "id") ||
+        firstLineParts.some((p) => p.includes("nama") || p.includes("name") || p.includes("siswa"));
+
+      const startIndex = isHeaderRow ? 1 : 0;
+      if (startIndex >= lines.length) {
+        toast.error("Berkas CSV hanya berisi baris header tanpa data siswa.");
         return;
       }
 
       const imported: Student[] = [];
-      // Skip header baris 0
-      for (let i = 1; i < lines.length; i++) {
+      for (let i = startIndex; i < lines.length; i++) {
         const parts = lines[i].split(",").map((p) => p.replace(/^"|"$/g, "").trim());
         if (parts.length >= 2 && parts[0] && parts[1]) {
           imported.push({
-            id: `std-imp-${Date.now()}-${i}`,
+            id: `std-imp-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
             nis: parts[0],
             name: parts[1],
             className: parts[2] || selectedClass,

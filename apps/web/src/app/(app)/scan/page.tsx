@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { CornerBracket } from "@/components/scan/corner-bracket";
 import { ShutterButton } from "@/components/scan/shutter-button";
 import { VerifySheet } from "@/components/scan/verify-sheet";
@@ -11,6 +12,7 @@ import { useSync } from "@/lib/sync-context";
 import { resizeImageFile } from "@/lib/image-utils";
 import { ExamConfig, GradedStudentRecord, OMRScanResponse, Student } from "@/types/omr";
 import { buildTemplateFromExam } from "@/lib/template-builder";
+import { detectFiducialsFromImageData, type CornerFlags } from "@/lib/fiducial-detector";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -22,10 +24,13 @@ import {
   Loader2,
   RefreshCw,
   Upload,
+  X,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function ScanPage() {
+  const router = useRouter();
   const { isOnline, refreshQueueCount } = useSync();
   // State escape hatch jika pengguna ingin beralih manual (misal tablet)
   const [deviceOverride, setDeviceOverride] = React.useState<"auto" | "camera" | "batch">("auto");
@@ -72,6 +77,19 @@ export default function ScanPage() {
   const [currentFileIndex, setCurrentFileIndex] = React.useState<number>(0);
 
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  // Fitur Auto-Shutter & Deteksi 4 Sudut LJK
+  const [autoShutter, setAutoShutter] = React.useState(true);
+  const [detectedCorners, setDetectedCorners] = React.useState<CornerFlags>({
+    tl: false,
+    tr: false,
+    bl: false,
+    br: false,
+  });
+  const [isShutterFlashing, setIsShutterFlashing] = React.useState(false);
+  const consecutiveHitsRef = React.useRef(0);
+  const autoCaptureBusyRef = React.useRef(false);
+  const offscreenCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
   // Deteksi otomatis lebar layar peramban (breakpoint lg: 1024px)
   React.useEffect(() => {
@@ -125,6 +143,82 @@ export default function ScanPage() {
       }
     };
   }, [activeMode, startCamera]);
+
+  // Auto-Shutter loop: mengevaluasi frame setiap 250ms saat kamera aktif
+  React.useEffect(() => {
+    if (cameraStatus !== "ACTIVE" || scanState !== "LOCKED" || !autoShutter) {
+      setDetectedCorners({ tl: false, tr: false, bl: false, br: false });
+      consecutiveHitsRef.current = 0;
+      return;
+    }
+
+    if (!offscreenCanvasRef.current) {
+      offscreenCanvasRef.current = document.createElement("canvas");
+      offscreenCanvasRef.current.width = 320;
+      offscreenCanvasRef.current.height = 450;
+    }
+
+    const canvas = offscreenCanvasRef.current;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+
+    let isDisposed = false;
+
+    const interval = setInterval(() => {
+      const video = videoRef.current;
+      if (
+        isDisposed ||
+        !video ||
+        video.readyState < 2 ||
+        video.videoWidth === 0 ||
+        autoCaptureBusyRef.current
+      ) {
+        return;
+      }
+
+      try {
+        ctx.drawImage(video, 0, 0, 320, 450);
+        const imgData = ctx.getImageData(0, 0, 320, 450);
+        const res = detectFiducialsFromImageData(imgData);
+
+        setDetectedCorners(res.corners);
+
+        if (res.detected) {
+          consecutiveHitsRef.current += 1;
+          // Butuh 2 evaluasi berturut-turut (~500ms stabil) agar kamera fokus dan lembar stabil
+          if (consecutiveHitsRef.current >= 2) {
+            autoCaptureBusyRef.current = true;
+            setIsShutterFlashing(true);
+            setTimeout(() => setIsShutterFlashing(false), 220);
+
+            if (navigator.vibrate) {
+              navigator.vibrate([40, 30, 40]);
+            }
+
+            const frame = captureFrameFromVideo();
+            if (frame) {
+              toast.info("4 Sudut LJK terkunci! Memindai otomatis...", { duration: 1500 });
+              handleCapture(frame);
+            }
+
+            setTimeout(() => {
+              autoCaptureBusyRef.current = false;
+              consecutiveHitsRef.current = 0;
+            }, 1800);
+          }
+        } else {
+          consecutiveHitsRef.current = 0;
+        }
+      } catch (err) {
+        // Abaikan error sesaat saat render canvas
+      }
+    }, 250);
+
+    return () => {
+      isDisposed = true;
+      clearInterval(interval);
+    };
+  }, [cameraStatus, scanState, autoShutter]);
 
   // Tangkap frame citra nyata dari video kamera (KRT-02)
   const captureFrameFromVideo = (): string | null => {
@@ -209,12 +303,14 @@ export default function ScanPage() {
     }
   };
 
-  // Handler tombol shutter (mengambil frame video nyata)
+  // Handler tombol shutter (manual atau fallback)
   const handleShutterClick = () => {
     if (cameraStatus !== "ACTIVE") {
       toast.error("Kamera belum siap. Izinkan akses kamera atau pilih foto dari penyimpanan.");
       return;
     }
+    setIsShutterFlashing(true);
+    setTimeout(() => setIsShutterFlashing(false), 220);
     const frame = captureFrameFromVideo();
     if (!frame) {
       toast.error("Frame video kamera belum siap. Arahkan kamera ke lembar LJK.");
@@ -314,14 +410,19 @@ export default function ScanPage() {
           />
         </div>
       ) : (
-        /* 2. JIKA MODE MOBILE KAMERA */
-        <div className="relative min-h-[calc(100vh-140px)] flex flex-col justify-between bg-slate-950 rounded-2xl overflow-hidden select-none -mx-2 sm:mx-0">
+        /* 2. JIKA MODE MOBILE KAMERA (FULLSCREEN VIEWPORT TANPA SCROLL) */
+        <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between overflow-hidden select-none">
+          {/* Efek Flash Shutter */}
+          {isShutterFlashing && (
+            <div className="absolute inset-0 bg-white/70 z-50 pointer-events-none transition-opacity duration-200" />
+          )}
+
           {/* Efek Senter Torch */}
           {torchOn && (
             <div className="absolute inset-0 bg-amber-100/15 mix-blend-screen pointer-events-none z-10 animate-in fade-in duration-200" />
           )}
 
-          {/* Video Stream Kamera */}
+          {/* Video Stream Kamera Fullscreen */}
           <video
             ref={videoRef}
             autoPlay
@@ -329,28 +430,69 @@ export default function ScanPage() {
             muted
             className={cn(
               "absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none",
-              cameraStatus === "ACTIVE" ? "opacity-60" : "opacity-0"
+              cameraStatus === "ACTIVE" ? "opacity-80" : "opacity-0"
             )}
           />
 
-          {/* Overlay Atas: Progress Siswa, Batch File Upload & Senter */}
-          <div className="relative z-20 flex items-center justify-between p-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white">
-              <span className="w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
-              <span className="text-xs font-semibold">
-                Terscan:{" "}
-                <strong className="text-brand-300 font-bold tabular-nums">
-                  {savedCount}/{totalStudents}
-                </strong>{" "}
-                Siswa
-              </span>
+          {/* Overlay Atas: Tombol Keluar, Status Siswa, Toggle Auto-Shutter, Upload, Senter */}
+          <div className="relative z-20 flex items-center justify-between p-3 sm:p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent pt-[max(12px,env(safe-area-inset-top))]">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (deviceOverride === "camera" && isDesktopScreen) {
+                    setDeviceOverride("batch");
+                  } else {
+                    router.push("/");
+                  }
+                }}
+                className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-black/80 transition-colors cursor-pointer"
+                title="Keluar dari layar kamera"
+                aria-label="Kembali"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white">
+                <span className="w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
+                <span className="text-xs font-semibold">
+                  Terscan:{" "}
+                  <strong className="text-brand-300 font-bold tabular-nums">
+                    {savedCount}/{totalStudents}
+                  </strong>
+                </span>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Tombol Upload Batch File LJK (Mendukung Multi-file) */}
-              <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-white/90 text-xs font-semibold hover:bg-black/80 transition-colors cursor-pointer">
-                <Upload className="w-3.5 h-3.5 text-brand-300" />
-                <span>Pilih Foto LJK</span>
+              {/* Toggle Auto-Shutter */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAutoShutter((prev) => {
+                    const next = !prev;
+                    toast.info(next ? "Auto-shutter diaktifkan (memotret otomatis saat 4 sudut terkunci)" : "Auto-shutter dinonaktifkan (mode manual)");
+                    return next;
+                  });
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold backdrop-blur-md border transition-all cursor-pointer",
+                  autoShutter
+                    ? "bg-emerald-600 text-white border-emerald-400 shadow-md ring-2 ring-emerald-400/30"
+                    : "bg-black/60 text-white/70 border-white/15 hover:bg-black/80"
+                )}
+                title={autoShutter ? "Auto-Shutter Aktif" : "Auto-Shutter Nonaktif"}
+              >
+                <Zap className={cn("w-3.5 h-3.5", autoShutter ? "fill-current text-white" : "text-white/60")} />
+                <span>{autoShutter ? "Auto-Shutter" : "Manual"}</span>
+              </button>
+
+              {/* Tombol Upload Batch File LJK */}
+              <label
+                className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-white/90 flex items-center justify-center hover:bg-black/80 transition-colors cursor-pointer"
+                title="Unggah Foto LJK dari Galeri"
+              >
+                <Upload className="w-4 h-4 text-brand-300" />
                 <input
                   type="file"
                   multiple
@@ -365,12 +507,13 @@ export default function ScanPage() {
                 type="button"
                 onClick={() => setTorchOn((t) => !t)}
                 className={cn(
-                  "w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer backdrop-blur-md border",
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-colors cursor-pointer backdrop-blur-md border",
                   torchOn
-                    ? "bg-amber-400 text-slate-950 border-amber-300"
+                    ? "bg-amber-400 text-slate-950 border-amber-300 shadow-lg"
                     : "bg-black/60 text-white/80 border-white/15 hover:bg-black/80"
                 )}
                 title="Senter Kamera"
+                aria-label="Senter Kamera"
               >
                 <Flashlight className="w-4 h-4" />
               </button>
@@ -378,10 +521,13 @@ export default function ScanPage() {
           </div>
 
           {/* Area Bingkai Bidik Viewfinder A4 */}
-          <div className="relative z-20 flex-1 flex flex-col items-center justify-center p-4">
-            <CornerBracket state={scanState === "VERIFY" ? "IDLE" : scanState} />
+          <div className="relative z-20 flex-1 flex flex-col items-center justify-center px-4">
+            <CornerBracket
+              state={scanState === "VERIFY" ? "IDLE" : scanState}
+              corners={detectedCorners}
+            />
 
-            {/* Status Pill di Bawah Bingkai */}
+            {/* Status Pill Live di Bawah Bingkai */}
             <div className="mt-4 flex flex-col items-center gap-2">
               {scanState === "PROCESSING" ? (
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-950/90 border border-brand-400/40 text-brand-300 text-xs font-semibold backdrop-blur-md animate-pulse">
@@ -421,10 +567,21 @@ export default function ScanPage() {
                   <span>Meminta izin akses kamera...</span>
                 </div>
               ) : scanState === "LOCKED" && cameraStatus === "ACTIVE" ? (
-                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-950/90 border border-brand-400/40 text-brand-300 text-xs font-bold backdrop-blur-md shadow-lg">
-                  <CheckCircle2 className="w-4 h-4 text-brand-400" />
-                  <span>Kamera Aktif • Arahkan ke 4 Kotak Sudut LJK</span>
-                </div>
+                detectedCorners.tl && detectedCorners.tr && detectedCorners.bl && detectedCorners.br ? (
+                  <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/90 border border-emerald-400/60 text-emerald-300 text-xs font-bold backdrop-blur-md shadow-lg animate-pulse">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>4 Sudut Terkunci! {autoShutter ? "Memindai Otomatis..." : "Ketuk Tombol Rana"}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-950/90 border border-brand-400/40 text-brand-300 text-xs font-medium backdrop-blur-md shadow-md">
+                    <CheckCircle2 className="w-4 h-4 text-brand-400" />
+                    <span>
+                      {Object.values(detectedCorners).filter(Boolean).length > 0
+                        ? `${Object.values(detectedCorners).filter(Boolean).length}/4 Sudut Terdeteksi`
+                        : "Arahkan Kamera ke 4 Sudut LJK"}
+                    </span>
+                  </div>
+                )
               ) : (
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 text-white/70 text-xs font-medium backdrop-blur-md">
                   <Info className="w-4 h-4 text-slate-300" />
@@ -437,24 +594,24 @@ export default function ScanPage() {
             <button
               type="button"
               onClick={() => setDeviceOverride("batch")}
-              className="mt-4 text-[11px] text-white/50 hover:text-white/90 underline transition-colors"
+              className="mt-3 text-[11px] text-white/50 hover:text-white/90 underline transition-colors cursor-pointer"
             >
               Beralih ke mode batch review tabel
             </button>
           </div>
 
-          {/* Action Bar Bawah: Shutter */}
-          <div className="relative z-20 bg-slate-900/90 backdrop-blur-md border-t border-white/10 p-5 flex flex-col items-center gap-3">
+          {/* Action Bar Bawah Mengambang (Tidak Pernah Tenggelam, Tanpa Scroll) */}
+          <div className="relative z-20 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-4 pb-[max(18px,env(safe-area-inset-bottom))] flex flex-col items-center gap-2">
             <ShutterButton
               isLocked={scanState === "LOCKED" && cameraStatus === "ACTIVE"}
               disabled={scanState === "PROCESSING" || cameraStatus !== "ACTIVE"}
               onClick={handleShutterClick}
             />
 
-            <p className="text-[11px] text-slate-400 text-center max-w-xs">
-              {cameraStatus === "ACTIVE"
-                ? "Pastikan 4 kotak sudut fiducial berada di dalam bingkai, lalu ketuk tombol rana untuk memotret."
-                : "Aktifkan izin kamera atau pilih berkas foto LJK untuk memulai."}
+            <p className="text-[11px] text-slate-400 text-center max-w-xs leading-relaxed">
+              {autoShutter
+                ? "Auto-Shutter aktif: Begitu 4 sudut kotak sejajar, kamera langsung memotret otomatis."
+                : "Ketuk tombol lingkaran di atas untuk memotret secara manual."}
             </p>
           </div>
 
