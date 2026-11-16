@@ -15,6 +15,7 @@ import {
   FileText,
   Loader2,
   RotateCcw,
+  Trash2,
   Upload,
   UserCheck,
   XCircle,
@@ -241,16 +242,63 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeTab, items.length]);
 
-  // Perhitungan Nilai Live Lembar Aktif
+  // Perhitungan Nilai Live Lembar Aktif (Cocokkan dengan Kunci Jawaban Ujian Aktif)
   const calculateScore = (scan?: OMRScanResponse) => {
-    if (!scan) return { grade: 0, validCount: 0, totalCount: activePgCount };
-    const validCount = scan.mcAnswers.filter((a) => a.status === "VALID").length;
+    if (!scan) return { grade: 0, validCount: 0, correctCount: 0, totalCount: activePgCount };
+
+    // Kunci jawaban dari konfigurasi ujian aktif
+    const mcConfig = examConfig?.multipleChoiceQuestions || [];
+
+    // Hitung jumlah jawaban yang terisi valid dan yang benar sesuai kunci
+    let correctCount = 0;
+    let validCount = 0;
+
+    scan.mcAnswers.forEach((ans) => {
+      if (ans.status === "VALID") {
+        validCount++;
+        const configItem = mcConfig.find((q) => q.number === ans.questionNumber);
+        const correctKey = configItem?.correctAnswer;
+        if (correctKey && ans.selectedOption === correctKey) {
+          correctCount++;
+        }
+      }
+    });
+
     const denominator = scan.mcAnswers.length > 0 ? scan.mcAnswers.length : activePgCount;
+    // Nilai = (Jawaban Benar / Total Soal) * 100
+    const grade = Math.round((correctCount / (denominator || 1)) * 100);
+
     return {
-      grade: Math.round((validCount / (denominator || 1)) * 100),
+      grade,
       validCount,
+      correctCount,
       totalCount: denominator,
     };
+  };
+
+  // Handler Hapus Satu Antrean
+  const handleDeleteItem = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setItems((prev) => {
+      const idx = prev.findIndex((item) => item.id === id);
+      const updated = prev.filter((item) => item.id !== id);
+      if (selectedIndex >= updated.length) {
+        setSelectedIndex(Math.max(0, updated.length - 1));
+      }
+      return updated;
+    });
+    toast.success("Lembar LJK dihapus dari antrean");
+  };
+
+  // Handler Hapus Semua Antrean
+  const handleClearAll = () => {
+    if (items.length === 0) return;
+    if (confirm("Apakah Anda yakin ingin menghapus seluruh berkas dalam antrean?")) {
+      setItems([]);
+      setSelectedIndex(0);
+      setActiveTab("dropzone");
+      toast.success("Seluruh antrean berkas telah dibersihkan");
+    }
   };
 
   const processedCount = items.filter((i) => i.status === "DONE").length;
@@ -301,24 +349,37 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
           )}
 
           {items.length > 0 && (
-            <Button
-              size="sm"
-              disabled={isProcessingAll || processedCount === items.length}
-              onClick={handleProcessBatch}
-              className="bg-brand-700 hover:bg-brand-800 text-white font-semibold text-xs shadow-sm flex items-center gap-1.5"
-            >
-              {isProcessingAll ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Memproses {processedCount}/{items.length}
-                </>
-              ) : (
-                <>
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  Proses Semua ({items.length})
-                </>
-              )}
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearAll}
+                className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 flex items-center gap-1.5"
+                title="Hapus semua berkas antrean"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Kosongkan Antrean</span>
+              </Button>
+
+              <Button
+                size="sm"
+                disabled={isProcessingAll || processedCount === items.length}
+                onClick={handleProcessBatch}
+                className="bg-brand-700 hover:bg-brand-800 text-white font-semibold text-xs shadow-sm flex items-center gap-1.5"
+              >
+                {isProcessingAll ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Memproses {processedCount}/{items.length}
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Proses Semua ({items.length})
+                  </>
+                )}
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -428,6 +489,16 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                       {item.status === "PENDING" && (
                         <span className="w-2 h-2 rounded-full bg-slate-300" />
                       )}
+
+                      {/* Tombol Hapus Lembar Ini */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteItem(item.id, e)}
+                        className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-1"
+                        title="Hapus lembar ini dari antrean"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </button>
                 );
@@ -524,17 +595,63 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                     {/* Ringkasan Skor Live */}
                     <div className="p-4 rounded-xl bg-gradient-to-br from-brand-50 to-emerald-50/40 border border-brand-200">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-brand-900 uppercase tracking-wider">
-                          NILAI AKHIR
-                        </span>
-                        <span className="text-2xl font-bold font-mono text-brand-800">
+                        <div>
+                          <span className="text-xs font-bold text-brand-900 uppercase tracking-wider block">
+                            NILAI AKHIR
+                          </span>
+                          <span className="text-[11px] text-brand-700 font-medium">
+                            {calculateScore(selectedItem.scanResult).correctCount} Benar dari {calculateScore(selectedItem.scanResult).totalCount} Soal
+                          </span>
+                        </div>
+                        <span className="text-3xl font-bold font-mono text-brand-800">
                           {calculateScore(selectedItem.scanResult).grade}
                         </span>
                       </div>
-                      <p className="text-xs text-brand-700 mt-1">
-                        {calculateScore(selectedItem.scanResult).validCount} dari{" "}
-                        {calculateScore(selectedItem.scanResult).totalCount} soal pilihan ganda terjawab valid.
-                      </p>
+                      <div className="mt-2 pt-2 border-t border-brand-200/60 flex items-center justify-between text-[11px] text-brand-800">
+                        <span>Status Pengisian LJK:</span>
+                        <span className="font-semibold">
+                          {calculateScore(selectedItem.scanResult).validCount} / {calculateScore(selectedItem.scanResult).totalCount} Terisi Valid
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Rincian Jawaban Siswa vs Kunci */}
+                    <div>
+                      <span className="text-xs font-bold text-slate-700 block mb-2">
+                        Pemeriksaan Jawaban ({calculateScore(selectedItem.scanResult).totalCount} Soal)
+                      </span>
+                      <div className="grid grid-cols-5 gap-1.5 mb-3">
+                        {selectedItem.scanResult?.mcAnswers.map((ans) => {
+                          const configItem = examConfig?.multipleChoiceQuestions?.find(
+                            (q) => q.number === ans.questionNumber
+                          );
+                          const correctKey = configItem?.correctAnswer || "A";
+                          const isCorrect = ans.status === "VALID" && ans.selectedOption === correctKey;
+                          const isWrong = ans.status === "VALID" && ans.selectedOption !== correctKey;
+
+                          return (
+                            <div
+                              key={ans.questionNumber}
+                              className={cn(
+                                "p-2 rounded-lg border text-center text-xs flex flex-col items-center justify-center transition-all",
+                                isCorrect
+                                  ? "bg-emerald-50 border-emerald-300 text-emerald-900"
+                                  : isWrong
+                                  ? "bg-rose-50 border-rose-300 text-rose-900"
+                                  : "bg-amber-50 border-amber-300 text-amber-900"
+                              )}
+                            >
+                              <span className="text-[10px] font-bold text-slate-500">#{ans.questionNumber}</span>
+                              <span className="text-sm font-bold font-mono my-0.5">
+                                {ans.selectedOption || "-"}
+                              </span>
+                              <span className="text-[9px] font-medium opacity-80">
+                                Kunci: {correctKey}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* Exception Warning List */}

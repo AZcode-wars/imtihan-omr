@@ -29,7 +29,8 @@ export default function ScanPage() {
   const { isOnline, refreshQueueCount } = useSync();
   // State escape hatch jika pengguna ingin beralih manual (misal tablet)
   const [deviceOverride, setDeviceOverride] = React.useState<"auto" | "camera" | "batch">("auto");
-  const [isDesktopScreen, setIsDesktopScreen] = React.useState(false);
+  // Defaultkan true saat inisialisasi awal di browser desktop agar kamera tidak langsung diminta
+  const [isDesktopScreen, setIsDesktopScreen] = React.useState(true);
 
   const [scanState, setScanState] = React.useState<
     "IDLE" | "LOCKED" | "PROCESSING" | "VERIFY"
@@ -69,8 +70,9 @@ export default function ScanPage() {
   const activeMode =
     deviceOverride === "auto" ? (isDesktopScreen ? "batch" : "camera") : deviceOverride;
 
-  // Inisialisasi Akses Kamera (hanya saat mode camera aktif)
+  // Inisialisasi Akses Kamera (hanya saat mode camera aktif di mobile atau jika user eksplisit memilih camera)
   React.useEffect(() => {
+    // Di layar desktop, jangan aktifkan kamera kecuali user eksplisit memilih 'camera'
     if (activeMode !== "camera") return;
 
     let stream: MediaStream | null = null;
@@ -84,7 +86,7 @@ export default function ScanPage() {
           videoRef.current.srcObject = stream;
         }
       } catch (err) {
-        console.warn("Kamera tidak dapat diakses langsung di simulator:", err);
+        console.warn("Kamera tidak dapat diakses langsung:", err);
       }
     };
 
