@@ -18,7 +18,7 @@ export interface BottomNavProps {
 }
 
 const navItems = [
-  { href: "/setup", label: "Ujian", icon: SlidersHorizontal },
+  { href: "/", label: "Ujian", icon: SlidersHorizontal },
   { href: "/students", label: "Kelas", icon: Users },
   { href: "/scan", label: "Scan", icon: ScanLine, isPrimary: true },
   { href: "/queue", label: "Antrean", icon: CloudUpload, hasBadge: true },
@@ -38,7 +38,9 @@ export function BottomNav({ queueCount = 0, className }: BottomNavProps) {
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive =
-          pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
+          item.href === "/"
+            ? pathname === "/" || pathname === "/setup"
+            : pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
 
         // Tombol Tengah Floating (Scan / +)
         if (item.isPrimary) {

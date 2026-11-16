@@ -19,7 +19,7 @@ export interface SidebarNavProps {
 }
 
 const menuItems = [
-  { href: "/setup", label: "Ujian & Aturan", icon: SlidersHorizontal },
+  { href: "/", label: "Ujian & Aturan", icon: SlidersHorizontal },
   { href: "/students", label: "Kelas & Siswa", icon: Users },
   { href: "/template", label: "Blueprint LJK", icon: FileText },
   { href: "/scan", label: "Scan LJK", icon: ScanLine },
@@ -60,7 +60,10 @@ export function SidebarNav({ queueCount = 0, className }: SidebarNavProps) {
         <nav className="space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
+            const isActive =
+              item.href === "/"
+                ? pathname === "/" || pathname === "/setup"
+                : pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
 
             return (
               <Link
