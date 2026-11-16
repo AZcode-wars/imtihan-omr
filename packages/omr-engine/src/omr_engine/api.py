@@ -113,7 +113,7 @@ def decode_data_url(data_url: str) -> np.ndarray:
     return decode_image_bytes(raw_bytes)
 
 
-def check_blurriness(image: np.ndarray, threshold: float = 20.0) -> float:
+def check_blurriness(image: np.ndarray, threshold: float = 15.0) -> float:
     """Hitung varians Laplacian untuk mendeteksi blur."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
     variance = float(cv2.Laplacian(gray, cv2.CV_64F).var())
@@ -122,7 +122,7 @@ def check_blurriness(image: np.ndarray, threshold: float = 20.0) -> float:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
                 f"Citra terlalu buram (laplacian variance = {variance:.1f} < {threshold}). "
-                "Harap ambil foto ulang dengan fokus yang stabil."
+                "Harap ambil foto ulang dengan fokus yang stabil dan pencahayaan cukup."
             ),
         )
     return variance

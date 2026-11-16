@@ -89,6 +89,7 @@ export default function ScanPage() {
   const [isShutterFlashing, setIsShutterFlashing] = React.useState(false);
   const consecutiveHitsRef = React.useRef(0);
   const autoCaptureBusyRef = React.useRef(false);
+  const cameraReadyTimeRef = React.useRef<number>(0);
   const offscreenCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
   // Deteksi otomatis lebar layar peramban (breakpoint lg: 1024px)
@@ -119,6 +120,7 @@ export default function ScanPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
+          cameraReadyTimeRef.current = Date.now();
           setCameraStatus("ACTIVE");
           setScanState("LOCKED");
         };
@@ -171,7 +173,8 @@ export default function ScanPage() {
         !video ||
         video.readyState < 2 ||
         video.videoWidth === 0 ||
-        autoCaptureBusyRef.current
+        autoCaptureBusyRef.current ||
+        Date.now() - cameraReadyTimeRef.current < 1200 // Jeda 1.2 detik pemanasan sensor & autofocus kamera
       ) {
         return;
       }
@@ -297,8 +300,17 @@ export default function ScanPage() {
       setScanResult(result);
       setScanState("VERIFY");
     } catch (err: any) {
-      console.error("Kesalahan Scan LJK:", err);
-      toast.error(err.message || "Gagal mendeteksi LJK. Pastikan 4 sudut masuk bingkai.");
+      const errorMsg: string = err?.message || "";
+      console.warn("Scan LJK belum berhasil:", errorMsg);
+
+      if (errorMsg.includes("buram") || errorMsg.includes("laplacian")) {
+        toast.warning("Foto terlalu buram / goyang. Dekatkan kamera dan pastikan kertas LJK fokus serta cukup cahaya.");
+      } else if (errorMsg.includes("fiducial") || errorMsg.includes("sudut")) {
+        toast.warning("4 sudut kotak LJK belum pas. Pastikan seluruh batas lembar masuk dalam bingkai.");
+      } else {
+        toast.error(errorMsg || "Gagal mendeteksi LJK. Pastikan 4 sudut masuk bingkai.");
+      }
+
       setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
     }
   };
