@@ -281,3 +281,46 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ============================================================================
+   Gaya Khusus Cetak (@media print)
+   Pastikan background grafis, warna SVG/kertas, dan 4 fiducial marker tercetak
+   presisi tanpa terpotong header/sidebar aplikasi.
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Sembunyikan elemen shell navigasi saat cetak */
+  header,
+  nav,
+  aside,
+  .print-hide {
+    display: none !important;
+  }
+
+  /* Buat lembar cetak menempati seluruh halaman A4 */
+  .print-sheet-container {
+    padding: 0 !important;
+    margin: 0 auto !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .print-sheet-container svg {
+    width: 210mm !important;
+    height: 297mm !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}

@@ -16,16 +16,16 @@ const buttonVariants = cva(
         primary:
           "bg-brand-700 text-white shadow-raised hover:bg-brand-800 aria-expanded:bg-brand-800",
         secondary:
-          "bg-white text-slate-700 border border-slate-200 hover:border-slate-300 aria-expanded:bg-slate-50",
+          "bg-white text-slate-800 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 aria-expanded:bg-slate-50",
         ghost:
-          "bg-transparent text-brand-700 hover:bg-brand-50 aria-expanded:bg-brand-50",
+          "bg-transparent text-brand-800 hover:bg-brand-50 aria-expanded:bg-brand-50",
         danger:
           "bg-rose-600 text-white shadow-raised hover:bg-rose-700 aria-expanded:bg-rose-700",
       },
       size: {
-        sm: "h-8 rounded-sm px-3 text-label",
-        md: "h-11 rounded-md px-4 text-body",
-        lg: "h-[52px] rounded-lg px-5 text-body font-bold",
+        sm: "h-8 rounded-sm px-3 text-xs leading-4",
+        md: "h-11 rounded-md px-4 text-sm leading-5",
+        lg: "h-[52px] rounded-lg px-5 text-base font-bold leading-6",
         icon: "size-11 rounded-md",
         "icon-sm": "size-8 rounded-sm",
       },

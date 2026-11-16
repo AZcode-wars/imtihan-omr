@@ -92,7 +92,7 @@ export default function DesignSystemPreview() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
       <header className="rounded-lg bg-brand-800 p-6 text-white">
-        <p className="text-overline text-brand-200">OpenOMR</p>
+        <p className="text-overline text-brand-200">ImtihanOMR</p>
         <h1 className="text-h1 font-bold tracking-tight">Design System Preview</h1>
         <p className="mt-1 text-body text-brand-100/80">
           Preview token yang sudah dipetakan ke Tailwind v4. Halaman ini
@@ -233,6 +233,23 @@ export default function DesignSystemPreview() {
           <Badge variant="default">MVP</Badge>
           <Badge variant="outline">outline</Badge>
           <Badge variant="secondary">secondary</Badge>
+        </div>
+      </Section>
+
+      <Section title="Navigasi Aplikasi (Task 6)">
+        <div className="flex flex-wrap items-center gap-3">
+          <a
+            href="/setup"
+            className="px-4 py-2 bg-brand-700 hover:bg-brand-800 text-white font-bold rounded-lg text-sm shadow-sm"
+          >
+            Buka Halaman Ujian (/setup) →
+          </a>
+          <a
+            href="/scan"
+            className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-lg text-sm shadow-sm hover:bg-slate-50"
+          >
+            Buka Halaman Scan (/scan) →
+          </a>
         </div>
       </Section>
     </main>
