@@ -3,8 +3,9 @@
  *
  * Menganalisis frame video kamera secara berkala pada kanvas beresolusi rendah (320x450 px).
  * Mendeteksi keberadaan 4 kotak fiducial hitam di 4 kuadran sudut lembar LJK A4
- * menggunakan adaptive contrast thresholding & blob analysis yang tahan terhadap
- * berbagai kondisi pencahayaan ruangan dan jarak kamera ponsel.
+ * dengan sensitivitas tinggi menggunakan Adaptive Contrast Thresholding dan
+ * Multi-Scale Connected Component Analysis yang tahan terhadap berbagai variasi jarak,
+ * bayangan tangan, dan pencahayaan ruangan kelas.
  */
 
 export interface CornerFlags {
@@ -30,19 +31,17 @@ export interface ZoneConfig {
   yMax: number;
 }
 
-// 4 Kuadran sudut pencarian fiducial pada kanvas 320 x 450 px.
-// Mencakup area kuadran sudut dengan margin tengah agar tidak membaca konten soal.
+// 4 Kuadran sudut pencarian fiducial pada kanvas 320 x 450 px (rasio A4).
+// Mencakup kuadran penuh dari tepi hingga mendekati tengah.
 export const CORNER_ZONES: Record<keyof CornerFlags, ZoneConfig> = {
-  tl: { xMin: 6, xMax: 155, yMin: 6, yMax: 215 },
-  tr: { xMin: 165, xMax: 314, yMin: 6, yMax: 215 },
-  bl: { xMin: 6, xMax: 155, yMin: 235, yMax: 444 },
-  br: { xMin: 165, xMax: 314, yMin: 235, yMax: 444 },
+  tl: { xMin: 0, xMax: 160, yMin: 0, yMax: 220 },
+  tr: { xMin: 160, xMax: 320, yMin: 0, yMax: 220 },
+  bl: { xMin: 0, xMax: 160, yMin: 230, yMax: 450 },
+  br: { xMin: 160, xMax: 320, yMin: 230, yMax: 450 },
 };
 
 /**
  * Hitung estimasi ketajaman (gradien varians) citra secara cepat.
- * Citra buram (out-of-focus ekstrem) memiliki varians < 2.0.
- * Citra dengan teks/lembar kertas fokus di smartphone memiliki varians >= 2.0.
  */
 export function calculateSharpness(
   pixels: Uint8ClampedArray,
@@ -79,7 +78,7 @@ export function calculateSharpness(
 
 /**
  * Memeriksa apakah suatu zona kuadran memiliki kotak hitam pekat (fiducial marker)
- * menggunakan Adaptive Contrast Thresholding dan Connected Component Analysis.
+ * dengan sensitivitas tinggi dan toleransi kontras dinamis.
  */
 export function checkCornerSquare(
   pixels: Uint8ClampedArray,
@@ -87,9 +86,9 @@ export function checkCornerSquare(
   height: number,
   zone: ZoneConfig
 ): boolean {
-  const step = 2; // Resolusi sampling 2px untuk performa sub-milidetik
+  const step = 2; // Subsampling 2px untuk kecepatan maksimal sub-milidetik
 
-  // 1. Kumpulkan statistik luminansi kuadran untuk ambang batas adaptif
+  // 1. Kumpulkan statistik luminansi kuadran
   let minLum = 255;
   let maxLum = 0;
   let totalLum = 0;
@@ -109,22 +108,24 @@ export function checkCornerSquare(
   if (sampleCount === 0) return false;
   const avgLum = totalLum / sampleCount;
 
-  // Ruangan terlalu gelap gulita (kamera tertutup atau lampu mati)
-  if (avgLum < 25) return false;
+  // Ruangan terlalu gelap gulita total (kamera tertutup)
+  if (avgLum < 15) return false;
 
-  // Kontras lokal antara area terang (kertas) dan gelap (marker) minimal 25 tingkat abu-abu
+  // Kontras lokal antara area terang dan gelap minimal 15 tingkat abu-abu (sangat sensitif)
   const contrast = maxLum - minLum;
-  if (contrast < 25) return false;
+  if (contrast < 15) return false;
 
-  // Ambang batas dinamis untuk pixel gelap kotak fiducial
-  const darkThreshold = minLum + contrast * 0.38;
+  // Ambang batas dinamis untuk pixel gelap kotak fiducial (42% dari rentang kontras)
+  const darkThreshold = minLum + contrast * 0.42;
 
-  // 2. Buat grid biner sederhana untuk kuadran tersebut
+  // 2. Buat grid biner untuk kuadran tersebut
   const gridW = Math.floor((zone.xMax - zone.xMin) / step);
   const gridH = Math.floor((zone.yMax - zone.yMin) / step);
-  const binaryGrid = new Uint8Array(gridW * gridH);
+  if (gridW <= 0 || gridH <= 0) return false;
 
+  const binaryGrid = new Uint8Array(gridW * gridH);
   let darkCountTotal = 0;
+
   for (let gy = 0; gy < gridH; gy++) {
     const y = zone.yMin + gy * step;
     for (let gx = 0; gx < gridW; gx++) {
@@ -138,22 +139,21 @@ export function checkCornerSquare(
     }
   }
 
-  // Jika tidak ada pixel gelap atau seluruh kuadran hitam pekat (meja hitam tanpa kertas)
-  if (darkCountTotal < 8 || darkCountTotal > (gridW * gridH * 0.7)) {
+  // Jika tidak ada pixel gelap atau hampir seluruh kuadran hitam pekat (meja hitam tanpa kertas)
+  if (darkCountTotal < 4 || darkCountTotal > (gridW * gridH * 0.85)) {
     return false;
   }
 
-  // 3. Flood-fill / Connected Component sederhana untuk mencari blob berbentuk bujur sangkar kompak
+  // 3. Flood-fill / Connected Component Analysis untuk mencari blob kotak fiducial
   const visited = new Uint8Array(gridW * gridH);
-  const queueX = new Int16Array(1024);
-  const queueY = new Int16Array(1024);
+  const queueX = new Int16Array(2048);
+  const queueY = new Int16Array(2048);
 
   for (let gy = 0; gy < gridH; gy++) {
     for (let gx = 0; gx < gridW; gx++) {
       const gIdx = gy * gridW + gx;
       if (binaryGrid[gIdx] === 0 || visited[gIdx] === 1) continue;
 
-      // Mulai BFS penelusuran blob
       let head = 0;
       let tail = 0;
       queueX[tail] = gx;
@@ -167,7 +167,7 @@ export function checkCornerSquare(
       let blobMaxY = gy;
       let blobArea = 0;
 
-      while (head < tail && tail < 1000) {
+      while (head < tail && tail < 2000) {
         const curX = queueX[head];
         const curY = queueY[head];
         head++;
@@ -178,7 +178,6 @@ export function checkCornerSquare(
         if (curY < blobMinY) blobMinY = curY;
         if (curY > blobMaxY) blobMaxY = curY;
 
-        // Cek 4 tetangga
         const neighbors = [
           [curX + 1, curY],
           [curX - 1, curY],
@@ -191,7 +190,7 @@ export function checkCornerSquare(
           const ny = neighbors[i][1];
           if (nx >= 0 && nx < gridW && ny >= 0 && ny < gridH) {
             const nIdx = ny * gridW + nx;
-            if (binaryGrid[nIdx] === 1 && visited[nIdx] === 0 && tail < 1000) {
+            if (binaryGrid[nIdx] === 1 && visited[nIdx] === 0 && tail < 2000) {
               visited[nIdx] = 1;
               queueX[tail] = nx;
               queueY[tail] = ny;
@@ -201,25 +200,25 @@ export function checkCornerSquare(
         }
       }
 
-      // Ukuran bounding box blob dalam satuan pixel kanvas
+      // Ukuran bounding box blob dalam satuan piksel kanvas
       const blobWidthPx = (blobMaxX - blobMinX + 1) * step;
       const blobHeightPx = (blobMaxY - blobMinY + 1) * step;
       const boundingBoxArea = (blobMaxX - blobMinX + 1) * (blobMaxY - blobMinY + 1);
-      const density = blobArea / boundingBoxArea;
+      const density = blobArea / Math.max(1, boundingBoxArea);
       const aspectRatio = blobWidthPx / Math.max(1, blobHeightPx);
 
-      // Kriteria kotak fiducial OMR:
-      // 1. Lebar & tinggi antara 8px dan 45px pada kanvas 320x450
-      // 2. Berbentuk bujur sangkar (aspek rasio antara 0.5 s/d 2.0)
-      // 3. Kompak/padat (density >= 0.40)
-      // 4. Area pixel minimal 10 cell tersampling
+      // Kriteria kotak fiducial OMR yang fleksibel & sensitif:
+      // 1. Lebar & tinggi antara 5px dan 55px pada kanvas 320x450
+      // 2. Berbentuk mendekati bujur sangkar (aspek rasio antara 0.4 s/d 2.5)
+      // 3. Kerapatan kompak (density >= 0.30)
+      // 4. Luas area tersampling minimal 4 cell (lebar ~5px)
       const isDimensionValid =
-        blobWidthPx >= 8 &&
-        blobWidthPx <= 45 &&
-        blobHeightPx >= 8 &&
-        blobHeightPx <= 45;
-      const isSquareLike = aspectRatio >= 0.5 && aspectRatio <= 2.0;
-      const isSolid = density >= 0.40 && blobArea >= 10;
+        blobWidthPx >= 5 &&
+        blobWidthPx <= 55 &&
+        blobHeightPx >= 5 &&
+        blobHeightPx <= 55;
+      const isSquareLike = aspectRatio >= 0.4 && aspectRatio <= 2.5;
+      const isSolid = density >= 0.30 && blobArea >= 4;
 
       if (isDimensionValid && isSquareLike && isSolid) {
         return true;
@@ -239,8 +238,8 @@ export function detectFiducialsFromImageData(
   const { data, width, height } = imageData;
 
   const sharpness = calculateSharpness(data, width, height);
-  // Ambang batas ketajaman minimum: citra tidak blur total
-  const isSharp = sharpness >= 2.0;
+  // Ambang batas ketajaman sangat toleran (tidak menolak citra dalam ruangan biasa)
+  const isSharp = sharpness >= 0.5;
 
   const tl = checkCornerSquare(data, width, height, CORNER_ZONES.tl);
   const tr = checkCornerSquare(data, width, height, CORNER_ZONES.tr);
@@ -248,7 +247,7 @@ export function detectFiducialsFromImageData(
   const br = checkCornerSquare(data, width, height, CORNER_ZONES.br);
 
   const cornerCount = (tl ? 1 : 0) + (tr ? 1 : 0) + (bl ? 1 : 0) + (br ? 1 : 0);
-  // Auto-shutter valid jika ke-4 sudut terdeteksi DAN citra tidak blur ekstrem
+  // Auto-shutter valid jika ke-4 sudut terdeteksi
   const detected = cornerCount === 4 && isSharp;
   const confidence = cornerCount / 4;
 
