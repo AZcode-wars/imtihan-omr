@@ -13,6 +13,11 @@ import { resizeImageFile } from "@/lib/image-utils";
 import { ExamConfig, GradedStudentRecord, OMRScanResponse, Student } from "@/types/omr";
 import { buildTemplateFromExam } from "@/lib/template-builder";
 import { detectFiducialsFromImageData, type CornerFlags } from "@/lib/fiducial-detector";
+import {
+  captureHighResFrame,
+  OPTIMAL_CAMERA_CONSTRAINTS,
+  FALLBACK_CAMERA_CONSTRAINTS,
+} from "@/lib/camera-utils";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -77,6 +82,7 @@ export default function ScanPage() {
   const [currentFileIndex, setCurrentFileIndex] = React.useState<number>(0);
 
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const mediaStreamRef = React.useRef<MediaStream | null>(null);
 
   // Fitur Auto-Shutter & Deteksi 4 Sudut LJK
   const [autoShutter, setAutoShutter] = React.useState(true);
@@ -105,7 +111,7 @@ export default function ScanPage() {
   const activeMode =
     deviceOverride === "auto" ? (isDesktopScreen ? "batch" : "camera") : deviceOverride;
 
-  // Inisialisasi & Pengendalian Akses Kamera (TGG-05)
+  // Inisialisasi & Pengendalian Akses Kamera (TGG-05) dengan Resolusi Tinggi
   const startCamera = React.useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraStatus("UNAVAILABLE");
@@ -114,9 +120,16 @@ export default function ScanPage() {
 
     setCameraStatus("REQUESTING");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1920 } },
-      });
+      let stream: MediaStream;
+      try {
+        // Coba constraint resolusi tinggi (1080p - 4K)
+        stream = await navigator.mediaDevices.getUserMedia(OPTIMAL_CAMERA_CONSTRAINTS);
+      } catch (optErr) {
+        console.warn("Constraint kamera optimal tidak didukung, menggunakan fallback:", optErr);
+        stream = await navigator.mediaDevices.getUserMedia(FALLBACK_CAMERA_CONSTRAINTS);
+      }
+
+      mediaStreamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
@@ -139,9 +152,14 @@ export default function ScanPage() {
 
     const videoEl = videoRef.current;
     return () => {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
       if (videoEl?.srcObject) {
         const stream = videoEl.srcObject as MediaStream;
         stream.getTracks().forEach((track) => track.stop());
+        videoEl.srcObject = null;
       }
     };
   }, [activeMode, startCamera]);
@@ -200,16 +218,25 @@ export default function ScanPage() {
               navigator.vibrate([40, 30, 40]);
             }
 
-            const frame = captureFrameFromVideo();
-            if (frame) {
-              toast.info("4 Sudut LJK terkunci! Memindai otomatis...", { duration: 1500 });
-              handleCapture(frame);
-            }
-
-            setTimeout(() => {
-              autoCaptureBusyRef.current = false;
-              consecutiveHitsRef.current = 0;
-            }, 2000);
+            toast.info("4 Sudut LJK terkunci! Memindai resolusi tinggi...", { duration: 1500 });
+            captureHighResFrame(video, mediaStreamRef.current)
+              .then((highResFrame) => {
+                const finalFrame = highResFrame || captureFrameFromVideo();
+                if (finalFrame) {
+                  handleCapture(finalFrame);
+                }
+              })
+              .catch((err) => {
+                console.warn("Gagal capture resolusi tinggi, menggunakan fallback:", err);
+                const fallbackFrame = captureFrameFromVideo();
+                if (fallbackFrame) handleCapture(fallbackFrame);
+              })
+              .finally(() => {
+                setTimeout(() => {
+                  autoCaptureBusyRef.current = false;
+                  consecutiveHitsRef.current = 0;
+                }, 2000);
+              });
           }
         } else {
           consecutiveHitsRef.current = 0;
@@ -318,14 +345,21 @@ export default function ScanPage() {
   };
 
   // Handler tombol shutter (manual atau fallback)
-  const handleShutterClick = () => {
+  const handleShutterClick = async () => {
     if (cameraStatus !== "ACTIVE") {
       toast.error("Kamera belum siap. Izinkan akses kamera atau pilih foto dari penyimpanan.");
       return;
     }
+    const video = videoRef.current;
+    if (!video) return;
+
     setIsShutterFlashing(true);
     setTimeout(() => setIsShutterFlashing(false), 220);
-    const frame = captureFrameFromVideo();
+
+    const frame =
+      (await captureHighResFrame(video, mediaStreamRef.current)) ||
+      captureFrameFromVideo();
+
     if (!frame) {
       toast.error("Frame video kamera belum siap. Arahkan kamera ke lembar LJK.");
       return;
