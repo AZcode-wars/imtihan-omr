@@ -146,9 +146,9 @@ export default function ScanPage() {
     };
   }, [activeMode, startCamera]);
 
-  // Auto-Shutter loop: mengevaluasi frame setiap 250ms saat kamera aktif
+  // Auto-Shutter loop: mengevaluasi frame setiap 200ms saat kamera aktif
   React.useEffect(() => {
-    if (cameraStatus !== "ACTIVE" || scanState !== "LOCKED" || !autoShutter) {
+    if (cameraStatus !== "ACTIVE" || scanState !== "LOCKED") {
       setDetectedCorners({ tl: false, tr: false, bl: false, br: false });
       consecutiveHitsRef.current = 0;
       return;
@@ -174,7 +174,7 @@ export default function ScanPage() {
         video.readyState < 2 ||
         video.videoWidth === 0 ||
         autoCaptureBusyRef.current ||
-        Date.now() - cameraReadyTimeRef.current < 1200 // Jeda 1.2 detik pemanasan sensor & autofocus kamera
+        Date.now() - cameraReadyTimeRef.current < 900 // Jeda 900ms pemanasan sensor & autofocus kamera
       ) {
         return;
       }
@@ -186,10 +186,12 @@ export default function ScanPage() {
 
         setDetectedCorners(res.corners);
 
-        if (res.detected) {
+        // Jika autoShutter aktif dan ke-4 sudut fiducial terdeteksi tajam
+        if (autoShutter && res.detected) {
           consecutiveHitsRef.current += 1;
-          // Butuh 2 evaluasi berturut-turut (~500ms stabil) agar kamera fokus dan lembar stabil
-          if (consecutiveHitsRef.current >= 2) {
+
+          // Trigger capture seketika saat ke-4 sudut terdeteksi
+          if (consecutiveHitsRef.current >= 1) {
             autoCaptureBusyRef.current = true;
             setIsShutterFlashing(true);
             setTimeout(() => setIsShutterFlashing(false), 220);
@@ -207,7 +209,7 @@ export default function ScanPage() {
             setTimeout(() => {
               autoCaptureBusyRef.current = false;
               consecutiveHitsRef.current = 0;
-            }, 1800);
+            }, 2000);
           }
         } else {
           consecutiveHitsRef.current = 0;
@@ -215,7 +217,7 @@ export default function ScanPage() {
       } catch (err) {
         // Abaikan error sesaat saat render canvas
       }
-    }, 250);
+    }, 200);
 
     return () => {
       isDisposed = true;
@@ -580,17 +582,22 @@ export default function ScanPage() {
                 </div>
               ) : scanState === "LOCKED" && cameraStatus === "ACTIVE" ? (
                 detectedCorners.tl && detectedCorners.tr && detectedCorners.bl && detectedCorners.br ? (
-                  <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/90 border border-emerald-400/60 text-emerald-300 text-xs font-bold backdrop-blur-md shadow-lg animate-pulse">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>4 Sudut Terkunci! {autoShutter ? "Memindai Otomatis..." : "Ketuk Tombol Rana"}</span>
+                  <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/90 border border-emerald-400/80 text-emerald-300 text-xs font-bold backdrop-blur-md shadow-[0_0_15px_rgba(52,211,153,0.4)] animate-pulse">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>4/4 Sudut Terkunci! {autoShutter ? "Memindai Otomatis..." : "Ketuk Tombol Rana"}</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-950/90 border border-brand-400/40 text-brand-300 text-xs font-medium backdrop-blur-md shadow-md">
-                    <CheckCircle2 className="w-4 h-4 text-brand-400" />
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/75 border border-white/20 text-white text-xs font-medium backdrop-blur-md shadow-md">
+                    <span className="flex items-center gap-1">
+                      <span className={cn("w-2 h-2 rounded-full transition-colors", detectedCorners.tl ? "bg-emerald-400 shadow-[0_0_6px_#34d399]" : "bg-white/30")} title="Kiri Atas" />
+                      <span className={cn("w-2 h-2 rounded-full transition-colors", detectedCorners.tr ? "bg-emerald-400 shadow-[0_0_6px_#34d399]" : "bg-white/30")} title="Kanan Atas" />
+                      <span className={cn("w-2 h-2 rounded-full transition-colors", detectedCorners.bl ? "bg-emerald-400 shadow-[0_0_6px_#34d399]" : "bg-white/30")} title="Kiri Bawah" />
+                      <span className={cn("w-2 h-2 rounded-full transition-colors", detectedCorners.br ? "bg-emerald-400 shadow-[0_0_6px_#34d399]" : "bg-white/30")} title="Kanan Bawah" />
+                    </span>
                     <span>
                       {Object.values(detectedCorners).filter(Boolean).length > 0
                         ? `${Object.values(detectedCorners).filter(Boolean).length}/4 Sudut Terdeteksi`
-                        : "Arahkan Kamera ke 4 Sudut LJK"}
+                        : "Arahkan kamera ke 4 kotak sudut LJK"}
                     </span>
                   </div>
                 )
