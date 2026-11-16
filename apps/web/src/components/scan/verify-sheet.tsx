@@ -28,6 +28,7 @@ import {
   ChevronDown,
   User,
   X,
+  XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -214,12 +215,9 @@ export function VerifySheet({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-t-3xl max-h-[92vh] flex flex-col shadow-sheet overflow-hidden max-w-2xl w-full mx-auto animate-in slide-in-from-bottom duration-300">
-        {/* Handle Sheet */}
-        <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto mt-3 shrink-0" />
-
+      <div className="bg-white rounded-none max-h-[94vh] flex flex-col shadow-sheet overflow-hidden max-w-2xl w-full mx-auto animate-in slide-in-from-bottom duration-300">
         {/* Header Sheet */}
-        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+        <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-brand-600 animate-pulse" />
             <h2 className="text-base font-bold text-slate-800">
@@ -229,7 +227,7 @@ export function VerifySheet({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -314,45 +312,106 @@ export function VerifySheet({
             </div>
           </section>
 
-          {/* Zona 3: Exception-First (Nomor Bermasalah) */}
+          {/* Zona 3: Pemeriksaan Jawaban Siswa (Benar / Salah) */}
           <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
-              <h3 className="text-xs font-bold text-slate-800">
-                {problemAnswers.length > 0
-                  ? `Perlu Dicek (${problemAnswers.length} Nomor) · Ketuk untuk Koreksi 1-Klik`
-                  : "Semua Jawaban PG Terbaca Bersih (100% Valid)"}
-              </h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-xs font-bold text-slate-800">
+                  Rincian Jawaban Siswa ({mcAnswers.length} Soal PG)
+                </h3>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] font-medium">
+                <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  Benar: {mcQuestionsInput.filter((q) => q.status === "ACTIVE" && q.selectedOption === q.correctAnswer).length}
+                </span>
+                <span className="flex items-center gap-1 text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  Salah: {mcQuestionsInput.filter((q) => q.status === "ACTIVE" && q.selectedOption !== q.correctAnswer).length}
+                </span>
+              </div>
             </div>
 
-            {problemAnswers.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {problemAnswers.map((ans) => (
-                  <ExceptionChip
+            {/* Grid Kartu Jawaban Soal: Terbaca vs Kunci */}
+            <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
+              {mcAnswers.map((ans) => {
+                const configItem = examConfig?.multipleChoiceQuestions?.find(
+                  (q) => q.number === ans.questionNumber
+                );
+                const correctKey = configItem?.correctAnswer || "A";
+                const isCorrect = ans.status === "VALID" && ans.selectedOption === correctKey;
+                const isWrong = ans.status === "VALID" && ans.selectedOption !== correctKey;
+                const isProblem = ans.status !== "VALID";
+
+                return (
+                  <button
                     key={ans.questionNumber}
-                    questionNumber={ans.questionNumber}
-                    status={ans.status}
-                    info={`${Math.round(ans.confidence * 100)}%`}
-                    isOpen={activeCorrectionQuestion === ans.questionNumber}
+                    type="button"
                     onClick={() =>
                       setActiveCorrectionQuestion((prev) =>
                         prev === ans.questionNumber ? null : ans.questionNumber
                       )
                     }
-                  />
-                ))}
+                    className={cn(
+                      "p-2 rounded-xl border text-center transition-all cursor-pointer select-none flex flex-col items-center justify-center relative active:scale-95",
+                      isCorrect
+                        ? "bg-emerald-50/90 border-emerald-300 text-emerald-950 hover:bg-emerald-100/70"
+                        : isWrong
+                        ? "bg-rose-50/90 border-rose-300 text-rose-950 hover:bg-rose-100/70"
+                        : "bg-amber-50/90 border-amber-300 text-amber-950 hover:bg-amber-100/70",
+                      activeCorrectionQuestion === ans.questionNumber &&
+                        "ring-2 ring-brand-600 border-brand-600 shadow-xs"
+                    )}
+                    title={`Soal #${ans.questionNumber} · Klik untuk koreksi manual`}
+                  >
+                    <div className="flex items-center justify-between w-full px-0.5 text-[10px] font-bold text-slate-500">
+                      <span>#{ans.questionNumber}</span>
+                      {isCorrect ? (
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      ) : isWrong ? (
+                        <XCircle className="w-3 h-3 text-rose-600" />
+                      ) : (
+                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                      )}
+                    </div>
+                    <span className="text-base font-extrabold font-mono my-0.5">
+                      {ans.selectedOption || "-"}
+                    </span>
+                    <span className="text-[10px] font-semibold opacity-75">
+                      Kunci: {correctKey}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Exception Note jika ada nomor ambigu/kosong */}
+            {problemAnswers.length > 0 && (
+              <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    Ada <strong>{problemAnswers.length} nomor</strong> bertanda ragu/kosong. Ketuk nomor di atas untuk mengoreksi.
+                  </span>
+                </div>
               </div>
             )}
 
             {/* Inline Editor Koreksi Cepat */}
             {activeCorrectionQuestion !== null && (
-              <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-3 animate-in fade-in duration-150">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-amber-900">
+                  <span className="font-bold text-slate-800">
                     Koreksi Jawaban Soal #{activeCorrectionQuestion}
                   </span>
-                  <span className="text-amber-700 text-[11px]">
-                    Pilih arsiran siswa yang benar:
+                  <span className="text-slate-500 text-[11px]">
+                    Kunci:{" "}
+                    <strong>
+                      {examConfig?.multipleChoiceQuestions?.find(
+                        (q) => q.number === activeCorrectionQuestion
+                      )?.correctAnswer || "A"}
+                    </strong>
                   </span>
                 </div>
 
