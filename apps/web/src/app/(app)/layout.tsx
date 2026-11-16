@@ -7,7 +7,7 @@ import { SidebarNav } from "@/components/sidebar-nav";
 import { SyncProvider, useSync } from "@/lib/sync-context";
 
 function AppLayoutInner({ children }: { children: React.ReactNode }) {
-  const { isOnline, queueCount } = useSync();
+  const { isOnline, queueCount, toggleSimulationOnline } = useSync();
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -20,9 +20,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         <div className="lg:hidden">
           <AppHeader
             isOnline={isOnline}
-            onToggleOnline={() => {
-              // Simulasi toggle jika di simulator
-            }}
+            onToggleOnline={toggleSimulationOnline}
           />
         </div>
 
