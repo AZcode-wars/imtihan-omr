@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { OMRScanResponse, Student } from "@/types/omr";
+import { ExamConfig, OMRScanResponse, Student } from "@/types/omr";
 import { Button } from "@/components/ui/button";
+import { getActiveExam } from "@/lib/db";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -29,6 +30,8 @@ export interface BatchItem {
   selectedStudentId?: string;
   error?: string;
   warningCount: number;
+  previewUrl?: string;
+  file?: File;
 }
 
 export interface DesktopBatchScanProps {
@@ -41,25 +44,34 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
   const [selectedIndex, setSelectedIndex] = React.useState<number>(0);
   const [isProcessingAll, setIsProcessingAll] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"dropzone" | "workspace">("dropzone");
+  const [examConfig, setExamConfig] = React.useState<ExamConfig | null>(null);
+
+  React.useEffect(() => {
+    async function loadConfig() {
+      const active = await getActiveExam();
+      if (active) setExamConfig(active);
+    }
+    loadConfig();
+  }, []);
 
   const selectedItem = items[selectedIndex] || null;
+  const activePgCount = examConfig?.multipleChoiceQuestions?.length ?? 30;
 
   // Mock generator hasil scan untuk demo/uji
-  const generateMockScan = (filename: string, idx: number): OMRScanResponse => {
-    const student = students[idx % students.length];
+  const generateMockScan = (filename: string, idx: number, previewUrl?: string): OMRScanResponse => {
     return {
       scanId: `batch-scan-${Date.now()}-${idx}`,
       sourceDevice: "DESKTOP_SCANNER",
       timestamp: new Date().toISOString(),
       studentNameCropUrl: "",
-      fullWarpedImageUrl: "/sheet-preview.png",
+      fullWarpedImageUrl: previewUrl || "/sheet-preview.png",
       essayAreaCropUrl: "",
-      mcAnswers: Array.from({ length: 30 }, (_, i) => {
+      mcAnswers: Array.from({ length: activePgCount }, (_, i) => {
         const qNum = i + 1;
-        if (qNum === 7 && idx % 2 === 0) {
+        if (qNum === 7 && idx % 2 === 0 && activePgCount >= 7) {
           return { questionNumber: qNum, selectedOption: null, status: "EMPTY", confidence: 0.95 };
         }
-        if (qNum === 13 && idx % 3 === 0) {
+        if (qNum === 13 && idx % 3 === 0 && activePgCount >= 13) {
           return { questionNumber: qNum, selectedOption: "A", status: "LOW_CONFIDENCE", confidence: 0.52, rawCandidates: ["A"] };
         }
         return {
@@ -73,6 +85,16 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
     };
   };
 
+  // Helper konversi file ke base64 data url
+  const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Handler Multi-File & Dropzone
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
@@ -80,6 +102,8 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
     const newItems: BatchItem[] = Array.from(fileList).map((file, idx) => ({
       id: `file-${Date.now()}-${idx}`,
       filename: file.name,
+      file,
+      previewUrl: URL.createObjectURL(file),
       status: "PENDING",
       warningCount: 0,
     }));
@@ -113,10 +137,19 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
     toast.success("8 lembar demo berhasil dimuat ke antrean");
   };
 
-  // Proses Semua Antrean Paralel
+  // Proses Semua Antrean Paralel (Mengirim berkas asli ke API Scan Engine)
   const handleProcessBatch = async () => {
     if (items.length === 0 || isProcessingAll) return;
     setIsProcessingAll(true);
+
+    // Ambil metadata template A4 (dari template.json)
+    let templateMeta: any = null;
+    try {
+      const resTpl = await fetch("/template.json");
+      if (resTpl.ok) templateMeta = await resTpl.json();
+    } catch {
+      // ignore
+    }
 
     const updated = [...items];
     for (let i = 0; i < updated.length; i++) {
@@ -124,22 +157,71 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
         updated[i].status = "PROCESSING";
         setItems([...updated]);
 
-        // Simulasi latensi pemrosesan paralel 400ms per lembar
-        await new Promise((r) => setTimeout(r, 400));
+        let result: OMRScanResponse;
+        let isRealScanned = false;
 
-        const result = generateMockScan(updated[i].filename, i);
+        // Jika memiliki berkas file asli yang diunggah
+        if (updated[i].file) {
+          try {
+            const formData = new FormData();
+            formData.append("file", updated[i].file!);
+            formData.append(
+              "template",
+              JSON.stringify(templateMeta || {
+                id: "tpl-default-a4",
+                examId: "exam-uts",
+                pageWidthMm: 210,
+                pageHeightMm: 297,
+                columnCount: 3,
+                bubbleDiameterMm: 4.5,
+                bubblePitchMm: 8.5,
+                fiducials: [],
+                nameCropRectMm: { x: 14, y: 30, w: 90, h: 20 },
+                multipleChoiceSlots: [],
+                essayAreaRectMm: { x: 14, y: 195, w: 176, h: 81 },
+              })
+            );
+            formData.append("sourceDevice", "DESKTOP_SCANNER");
+
+            const scanRes = await fetch("/api/scan", {
+              method: "POST",
+              body: formData,
+            });
+
+            if (scanRes.ok) {
+              const realData = await scanRes.json();
+              // Filter nomor soal sesuai jumlah PG yang diatur guru di Ujian & Aturan
+              const filteredMc = (realData.mcAnswers || []).slice(0, activePgCount);
+              result = {
+                ...realData,
+                fullWarpedImageUrl: realData.fullWarpedImageUrl || updated[i].previewUrl || "/sheet-preview.png",
+                mcAnswers: filteredMc,
+              };
+              isRealScanned = true;
+            } else {
+              throw new Error("Engine backend tidak merespons sukses.");
+            }
+          } catch (err: any) {
+            console.warn("Gagal memproses via engine, fallback ke simulasi:", err);
+            result = generateMockScan(updated[i].filename, i, updated[i].previewUrl);
+          }
+        } else {
+          await new Promise((r) => setTimeout(r, 300));
+          result = generateMockScan(updated[i].filename, i, updated[i].previewUrl);
+        }
+
         const warnings = result.mcAnswers.filter((a) => a.status !== "VALID").length;
 
         updated[i].status = "DONE";
         updated[i].scanResult = result;
-        updated[i].selectedStudentId = students[i % students.length]?.id;
+        updated[i].selectedStudentId = students[i % (students.length || 1)]?.id;
         updated[i].warningCount = warnings;
         setItems([...updated]);
       }
     }
 
     setIsProcessingAll(false);
-    toast.success("Pemrosesan batch selesai!");
+    toast.success("Pemrosesan antrean batch selesai!");
   };
 
   // Navigasi Keyboard Arrow Up / Down
@@ -161,11 +243,13 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
 
   // Perhitungan Nilai Live Lembar Aktif
   const calculateScore = (scan?: OMRScanResponse) => {
-    if (!scan) return { grade: 0, validCount: 0 };
+    if (!scan) return { grade: 0, validCount: 0, totalCount: activePgCount };
     const validCount = scan.mcAnswers.filter((a) => a.status === "VALID").length;
+    const denominator = scan.mcAnswers.length > 0 ? scan.mcAnswers.length : activePgCount;
     return {
-      grade: Math.round((validCount / 30) * 100),
+      grade: Math.round((validCount / (denominator || 1)) * 100),
       validCount,
+      totalCount: denominator,
     };
   };
 
@@ -405,7 +489,7 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                     <div className="w-full h-80 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center relative">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src="/sheet-preview.png"
+                        src={selectedItem.scanResult?.fullWarpedImageUrl || selectedItem.previewUrl || "/sheet-preview.png"}
                         alt="LJK Lurus"
                         className="w-full h-full object-contain p-2"
                       />
@@ -448,7 +532,8 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                         </span>
                       </div>
                       <p className="text-xs text-brand-700 mt-1">
-                        {calculateScore(selectedItem.scanResult).validCount} dari 30 soal pilihan ganda terjawab valid.
+                        {calculateScore(selectedItem.scanResult).validCount} dari{" "}
+                        {calculateScore(selectedItem.scanResult).totalCount} soal pilihan ganda terjawab valid.
                       </p>
                     </div>
 
@@ -460,7 +545,9 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                       {selectedItem.warningCount === 0 ? (
                         <div className="p-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs flex items-center gap-2">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>Semua 30 nomor terbaca mantap tanpa keraguan.</span>
+                          <span>
+                            Semua {calculateScore(selectedItem.scanResult).totalCount} nomor terbaca mantap tanpa keraguan.
+                          </span>
                         </div>
                       ) : (
                         <div className="space-y-2">

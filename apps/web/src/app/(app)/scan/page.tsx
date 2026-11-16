@@ -6,10 +6,10 @@ import { ShutterButton } from "@/components/scan/shutter-button";
 import { VerifySheet } from "@/components/scan/verify-sheet";
 import { DesktopBatchScan } from "@/components/scan/desktop-batch-scan";
 import { Button } from "@/components/ui/button";
-import { addToQueue } from "@/lib/db";
+import { addToQueue, getActiveExam } from "@/lib/db";
 import { useSync } from "@/lib/sync-context";
 import { resizeImageFile } from "@/lib/image-utils";
-import { OMRScanResponse, Student } from "@/types/omr";
+import { ExamConfig, OMRScanResponse, Student } from "@/types/omr";
 import { toast } from "sonner";
 import {
   Camera,
@@ -38,6 +38,17 @@ export default function ScanPage() {
   const [scanResult, setScanResult] = React.useState<OMRScanResponse | null>(null);
   const [savedCount, setSavedCount] = React.useState(0);
   const totalStudents = 0;
+  const [examConfig, setExamConfig] = React.useState<ExamConfig | null>(null);
+
+  React.useEffect(() => {
+    async function loadConfig() {
+      const active = await getActiveExam();
+      if (active) setExamConfig(active);
+    }
+    loadConfig();
+  }, []);
+
+  const activePgCount = examConfig?.multipleChoiceQuestions?.length ?? 30;
 
   // Batch mobile upload queue
   const [pendingMobileFiles, setPendingMobileFiles] = React.useState<string[]>([]);
@@ -118,12 +129,21 @@ export default function ScanPage() {
         }
 
         try {
-          const res = await fetch("http://localhost:8000/v1/scan/json", {
+          // Ambil metadata template jika ada
+          let templatePayload: any = null;
+          try {
+            const tplRes = await fetch("/template.json");
+            if (tplRes.ok) templatePayload = await tplRes.json();
+          } catch {
+            // ignore
+          }
+
+          const res = await fetch("/api/scan", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              template: {
-                id: "tpl-1",
+              template: templatePayload || {
+                id: "tpl-default-a4",
                 examId: "exam-1",
                 pageWidthMm: 210,
                 pageHeightMm: 297,
@@ -140,12 +160,17 @@ export default function ScanPage() {
             }),
           });
           if (res.ok) {
-            result = await res.json();
+            const realData = await res.json();
+            result = {
+              ...realData,
+              fullWarpedImageUrl: realData.fullWarpedImageUrl || imageDataUrl,
+              mcAnswers: (realData.mcAnswers || []).slice(0, activePgCount),
+            };
           } else {
             throw new Error("Gagal memproses via Engine API");
           }
         } catch {
-          result = createMockScanResult();
+          result = createMockScanResult(imageDataUrl);
         }
       } else {
         await new Promise((r) => setTimeout(r, 800));
@@ -202,23 +227,23 @@ export default function ScanPage() {
   };
 
   // Mock Scan Generator
-  const createMockScanResult = (): OMRScanResponse => {
+  const createMockScanResult = (previewImg?: string): OMRScanResponse => {
     return {
       scanId: `scan-${Date.now()}`,
       sourceDevice: "MOBILE_CAMERA",
       timestamp: new Date().toISOString(),
       studentNameCropUrl: "",
-      fullWarpedImageUrl: "/sheet-preview.png",
+      fullWarpedImageUrl: previewImg || "/sheet-preview.png",
       essayAreaCropUrl: "",
-      mcAnswers: Array.from({ length: 30 }, (_, i) => {
+      mcAnswers: Array.from({ length: activePgCount }, (_, i) => {
         const qNum = i + 1;
-        if (qNum === 7) {
+        if (qNum === 7 && activePgCount >= 7) {
           return { questionNumber: qNum, selectedOption: null, status: "EMPTY", confidence: 0.95 };
         }
-        if (qNum === 11) {
+        if (qNum === 11 && activePgCount >= 11) {
           return { questionNumber: qNum, selectedOption: null, status: "MULTIPLE", confidence: 0.92, rawCandidates: ["A", "C"] };
         }
-        if (qNum === 13) {
+        if (qNum === 13 && activePgCount >= 13) {
           return { questionNumber: qNum, selectedOption: "A", status: "LOW_CONFIDENCE", confidence: 0.52, rawCandidates: ["A"] };
         }
         return {

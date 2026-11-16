@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   DetectedMCAnswer,
   EssayMark,
+  ExamConfig,
   OMRScanResponse,
   OptionLabel,
   Student,
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 import { ExceptionChip } from "@/components/ui/exception-chip";
 import { EssayMarkRow } from "@/components/scan/essay-mark-row";
+import { getActiveExam } from "@/lib/db";
 import {
   calculateFinalGrade,
   formatFinalScore,
@@ -48,21 +50,56 @@ export function VerifySheet({
   const [selectedStudentId, setSelectedStudentId] = React.useState<string>(
     students[0]?.id || ""
   );
+  const [examConfig, setExamConfig] = React.useState<ExamConfig | null>(null);
+
+  React.useEffect(() => {
+    async function loadConfig() {
+      const active = await getActiveExam();
+      if (active) setExamConfig(active);
+    }
+    loadConfig();
+  }, []);
+
+  // Filter nomor jawaban sesuai soal aktif
+  const activePgCount = examConfig?.multipleChoiceQuestions?.length ?? scanResult.mcAnswers.length;
+  const filteredInitialMc = scanResult.mcAnswers.slice(0, activePgCount);
 
   // State Jawaban PG (Bisa dikoreksi)
   const [mcAnswers, setMcAnswers] = React.useState<DetectedMCAnswer[]>(
-    scanResult.mcAnswers
+    filteredInitialMc
   );
+
+  React.useEffect(() => {
+    setMcAnswers(scanResult.mcAnswers.slice(0, activePgCount));
+  }, [scanResult, activePgCount]);
 
   // Nomor soal yang sedang dibuka inline koreksinya
   const [activeCorrectionQuestion, setActiveCorrectionQuestion] =
     React.useState<number | null>(null);
 
-  // State Nilai Esai Guru
-  const [essayMarks, setEssayMarks] = React.useState<EssayMark[]>([
-    { questionNumber: 1, maxScore: 5, outcome: "CORRECT", pointsAwarded: 5 },
-    { questionNumber: 2, maxScore: 5, outcome: "PARTIAL", pointsAwarded: 3.5 },
-  ]);
+  // State Nilai Esai Guru (sesuai jumlah esai pada ujian aktif)
+  const essayCount = examConfig?.essayQuestions?.length ?? 0;
+  const [essayMarks, setEssayMarks] = React.useState<EssayMark[]>(() => {
+    return Array.from({ length: essayCount }, (_, i) => ({
+      questionNumber: i + 1,
+      maxScore: examConfig?.essayQuestions[i]?.maxScore || 5,
+      outcome: "CORRECT",
+      pointsAwarded: examConfig?.essayQuestions[i]?.maxScore || 5,
+    }));
+  });
+
+  React.useEffect(() => {
+    if (examConfig?.essayQuestions) {
+      setEssayMarks(
+        examConfig.essayQuestions.map((eq) => ({
+          questionNumber: eq.number,
+          maxScore: eq.maxScore,
+          outcome: "CORRECT",
+          pointsAwarded: eq.maxScore,
+        }))
+      );
+    }
+  }, [examConfig]);
 
   // Nomor-nomor bermasalah (Exception First)
   const problemAnswers = mcAnswers.filter((a) => a.status !== "VALID");
@@ -110,15 +147,18 @@ export function VerifySheet({
     );
   };
 
-  // Kalkulasi Skor Live (Mode A 60% : 40% default)
-  const mcQuestionsInput: McQuestionResult[] = mcAnswers.map((a) => ({
-    number: a.questionNumber,
-    correctAnswer: "A",
-    selectedOption: a.selectedOption,
-    pointsCorrect: 1,
-    pointsWrong: 0,
-    status: "ACTIVE",
-  }));
+  // Kalkulasi Skor Live (sesuai konfigurasi ujian aktif)
+  const mcQuestionsInput: McQuestionResult[] = mcAnswers.map((a) => {
+    const configQ = examConfig?.multipleChoiceQuestions?.find((q) => q.number === a.questionNumber);
+    return {
+      number: a.questionNumber,
+      correctAnswer: configQ?.correctAnswer || "A",
+      selectedOption: a.selectedOption,
+      pointsCorrect: configQ?.pointsCorrect ?? 1,
+      pointsWrong: configQ?.pointsWrong ?? 0,
+      status: configQ?.status || "ACTIVE",
+    };
+  });
 
   const essayQuestionsInput: EssayMarkResult[] = essayMarks.map((e) => ({
     number: e.questionNumber,
@@ -127,12 +167,17 @@ export function VerifySheet({
     partialScore: e.pointsAwarded,
   }));
 
+  const weights = examConfig?.sectionWeights || {
+    multipleChoicePercent: essayCount > 0 ? 60 : 100,
+    essayPercent: essayCount > 0 ? 40 : 0,
+  };
+
   const scoreSummary = calculateFinalGrade({
-    mode: "MODE_A_PERCENTAGE",
-    weights: { multipleChoicePercent: 60, essayPercent: 40 },
+    mode: examConfig?.scoringMode || "MODE_A_PERCENTAGE",
+    weights,
     mcQuestions: mcQuestionsInput,
     essayQuestions: essayQuestionsInput,
-    rounding: "ROUND_HALF_UP",
+    rounding: examConfig?.rounding || "ROUND_HALF_UP",
   });
 
   const formattedScore = formatFinalScore(scoreSummary);

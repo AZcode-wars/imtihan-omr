@@ -198,3 +198,54 @@ export async function addStudent(student: Student): Promise<void> {
     req.onerror = () => reject(req.error);
   });
 }
+
+/* ------------------------------------------------------------------ *
+ * Operasi Konfigurasi Ujian Aktif (exams)
+ * ------------------------------------------------------------------ */
+
+export const ACTIVE_EXAM_ID = "active_exam_config";
+
+export async function saveActiveExam(exam: ExamConfig): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.EXAMS, "readwrite");
+    const store = tx.objectStore(STORES.EXAMS);
+    const req = store.put({ ...exam, id: ACTIVE_EXAM_ID });
+    req.onsuccess = () => {
+      // Simpan juga di localStorage sebagai backup sinkron langsung
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(ACTIVE_EXAM_ID, JSON.stringify(exam));
+        } catch {
+          // ignore localStorage error
+        }
+      }
+      resolve();
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getActiveExam(): Promise<ExamConfig | null> {
+  if (typeof window === "undefined") return null;
+
+  // Coba ambil cepat dari localStorage lebih dulu
+  try {
+    const cached = localStorage.getItem(ACTIVE_EXAM_ID);
+    if (cached) {
+      return JSON.parse(cached) as ExamConfig;
+    }
+  } catch {
+    // fallback ke indexedDB
+  }
+
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.EXAMS, "readonly");
+    const store = tx.objectStore(STORES.EXAMS);
+    const req = store.get(ACTIVE_EXAM_ID);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+

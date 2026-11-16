@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { getActiveExam } from "@/lib/db";
+import { ExamConfig } from "@/types/omr";
+
 export interface SidebarNavProps {
   queueCount?: number;
   className?: string;
@@ -29,6 +32,15 @@ const menuItems = [
 
 export function SidebarNav({ queueCount = 0, className }: SidebarNavProps) {
   const pathname = usePathname();
+  const [exam, setExam] = React.useState<ExamConfig | null>(null);
+
+  React.useEffect(() => {
+    async function load() {
+      const active = await getActiveExam();
+      if (active) setExam(active);
+    }
+    load();
+  }, [pathname]);
 
   return (
     <aside
@@ -101,9 +113,12 @@ export function SidebarNav({ queueCount = 0, className }: SidebarNavProps) {
       <div className="p-4 border-t border-slate-100 bg-slate-50/50">
         <div className="px-2 py-1">
           <p className="text-xs font-bold text-slate-700 truncate">
-            UTS Matematika
+            {exam?.title || "UTS Matematika"}
           </p>
-          <p className="text-[11px] text-slate-400">Kelas 8A · 30 Siswa</p>
+          <p className="text-[11px] text-slate-400">
+            Kelas {exam?.className || "8A"} · {exam?.multipleChoiceQuestions?.length ?? 30} Soal PG
+            {exam?.essayQuestions?.length ? ` + ${exam.essayQuestions.length} Esai` : ""}
+          </p>
         </div>
       </div>
     </aside>

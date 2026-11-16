@@ -3,12 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { OptionLabel, QuestionStatus, RoundingRule, ScoringMode } from "@/types/omr";
+import { ExamConfig, OptionLabel, QuestionStatus, RoundingRule, ScoringMode } from "@/types/omr";
 import { Stepper } from "@/components/ui/stepper";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Button } from "@/components/ui/button";
 import { AnswerKeyGrid, AnswerKeyItem } from "@/components/answer-key-grid";
 import { KeyEditorModal } from "@/components/key-editor-modal";
+import { getActiveExam, saveActiveExam } from "@/lib/db";
 import { toast } from "sonner";
 import { FileText, Camera } from "lucide-react";
 
@@ -40,6 +41,42 @@ export default function SetupPage() {
       status: "ACTIVE" as QuestionStatus,
     }));
   });
+
+  // Muat konfigurasi tersimpan saat pertama kali halaman dibuka
+  React.useEffect(() => {
+    async function loadSavedConfig() {
+      try {
+        const saved = await getActiveExam();
+        if (saved) {
+          setExamTitle(saved.title || "");
+          setClassNameVal(saved.className || "8A");
+          setPassingScore(saved.passingScore ?? 75);
+          setScoringMode(saved.scoringMode || "MODE_A_PERCENTAGE");
+          setRoundingRule(saved.rounding || "ROUND_HALF_UP");
+          if (saved.sectionWeights) {
+            setWeightPg(saved.sectionWeights.multipleChoicePercent ?? 60);
+            setWeightEssay(saved.sectionWeights.essayPercent ?? 40);
+          }
+          if (saved.multipleChoiceQuestions?.length > 0) {
+            setPgCount(saved.multipleChoiceQuestions.length);
+            setAnswers(
+              saved.multipleChoiceQuestions.map((q) => ({
+                questionNumber: q.number,
+                key: q.correctAnswer,
+                status: q.status,
+              }))
+            );
+          }
+          if (saved.essayQuestions) {
+            setEssayCount(saved.essayQuestions.length);
+          }
+        }
+      } catch (err) {
+        console.warn("Gagal memuat konfigurasi ujian:", err);
+      }
+    }
+    loadSavedConfig();
+  }, []);
 
   // Sinkronisasi jumlah kunci saat pgCount berubah
   React.useEffect(() => {
@@ -80,9 +117,40 @@ export default function SetupPage() {
     setWeightEssay(100 - val);
   };
 
-  const handleSaveAndScan = () => {
-    toast.success("Konfigurasi ujian berhasil disimpan!");
-    router.push("/scan");
+  const handleSaveAndScan = async () => {
+    const examConfig: ExamConfig = {
+      id: "active_exam_config",
+      title: examTitle,
+      classId: "cls-8a",
+      className: classNameVal,
+      passingScore,
+      scoringMode,
+      rounding: roundingRule,
+      sectionWeights: {
+        multipleChoicePercent: weightPg,
+        essayPercent: weightEssay,
+      },
+      multipleChoiceQuestions: answers.map((a) => ({
+        number: a.questionNumber,
+        correctAnswer: a.key || "A",
+        pointsCorrect: pointsPerPg,
+        pointsWrong: 0,
+        status: a.status,
+      })),
+      essayQuestions: Array.from({ length: essayCount }, (_, i) => ({
+        number: i + 1,
+        maxScore: maxScorePerEssay,
+      })),
+    };
+
+    try {
+      await saveActiveExam(examConfig);
+      toast.success("Konfigurasi ujian berhasil disimpan ke sesi lokal!");
+      router.push("/scan");
+    } catch (err) {
+      console.error("Gagal menyimpan konfigurasi:", err);
+      toast.error("Gagal menyimpan konfigurasi ujian.");
+    }
   };
 
   // Kalkulasi total poin maksimal
