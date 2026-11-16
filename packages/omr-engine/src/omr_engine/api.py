@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from typing import Annotated, Any, Literal
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from openomr_schemas import ExamTemplate, OMRScanResponse
 from pydantic import BaseModel, Field
@@ -23,6 +24,19 @@ from pydantic import BaseModel, Field
 from .grade import grade_sheet_image
 from .imaging import FiducialDetectionError
 from .template import TemplateOverflowError, build_template
+
+# API Key opsional via environment variable OMR_API_KEY
+OMR_API_KEY = os.getenv("OMR_API_KEY", "")
+
+
+def verify_api_key(x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None) -> None:
+    """Verifikasi header X-API-Key jika OMR_API_KEY dikonfigurasi di environment."""
+    if OMR_API_KEY:
+        if not x_api_key or x_api_key != OMR_API_KEY:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Akses ditolak: X-API-Key tidak valid atau belum disertakan.",
+            )
 
 app = FastAPI(
     title="OpenOMR Engine API",
@@ -157,6 +171,7 @@ def scan_sheet_multipart(
     source_device: Annotated[
         Literal["MOBILE_CAMERA", "DESKTOP_SCANNER"], Form(alias="sourceDevice")
     ] = "MOBILE_CAMERA",
+    _: None = Depends(verify_api_key),
 ) -> OMRScanResponse:
     """Scan lembar LJK via multipart/form-data upload."""
     try:
@@ -193,7 +208,10 @@ def scan_sheet_multipart(
 
 
 @app.post("/v1/scan/json", response_model=OMRScanResponse)
-def scan_sheet_json(req: ScanJSONRequest) -> OMRScanResponse:
+def scan_sheet_json(
+    req: ScanJSONRequest,
+    _: None = Depends(verify_api_key),
+) -> OMRScanResponse:
     """Scan lembar LJK via JSON body dengan Base64 data URL."""
     try:
         ExamTemplate.model_validate(req.template)

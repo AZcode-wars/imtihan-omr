@@ -145,3 +145,36 @@ def test_scan_blurry_image(tmp_path: Path) -> None:
 
     assert res.status_code == 422
     assert "buram" in res.json()["detail"]
+
+
+def test_api_key_protection(monkeypatch: pytest.MonkeyPatch, synth_sheet: tuple[Path, dict, dict]) -> None:
+    """Uji proteksi endpoint scan dengan API Key."""
+    png_path, template, _ = synth_sheet
+
+    # Set API Key di environment
+    import omr_engine.api as api_mod
+    monkeypatch.setattr(api_mod, "OMR_API_KEY", "secret-test-key")
+
+    with open(png_path, "rb") as f:
+        files = {"file": ("sheet.png", f, "image/png")}
+        data = {"template": json.dumps(template)}
+
+        # 1. Tanpa API Key -> Ditolak (401)
+        res_no_key = client.post("/v1/scan", data=data, files=files)
+        assert res_no_key.status_code == 401
+
+    with open(png_path, "rb") as f:
+        files = {"file": ("sheet.png", f, "image/png")}
+        data = {"template": json.dumps(template)}
+
+        # 2. API Key salah -> Ditolak (401)
+        res_wrong_key = client.post("/v1/scan", data=data, files=files, headers={"X-API-Key": "wrong-key"})
+        assert res_wrong_key.status_code == 401
+
+    with open(png_path, "rb") as f:
+        files = {"file": ("sheet.png", f, "image/png")}
+        data = {"template": json.dumps(template)}
+
+        # 3. API Key benar -> Lolos (200)
+        res_ok = client.post("/v1/scan", data=data, files=files, headers={"X-API-Key": "secret-test-key"})
+        assert res_ok.status_code == 200
