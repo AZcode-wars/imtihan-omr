@@ -221,7 +221,11 @@ export default function TemplateBlueprintPage() {
           </div>
 
           {/* Interactive Rendering Canvas */}
-          <div className="w-full flex justify-center overflow-auto pb-8">
+          <div className="w-full flex flex-col items-center overflow-auto pb-8">
+            <div className="mb-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200/80 text-[11px] font-semibold text-slate-600 flex items-center gap-1.5 print-hide">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Pratinjau Lembar Kosong Siswa (Siap Cetak — Lingkaran Bersih Tanpa Arsiran Jawaban)</span>
+            </div>
             {activeTab === "svg" ? (
               <LjkBlueprintSvg
                 template={template}
@@ -238,7 +242,7 @@ export default function TemplateBlueprintPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/sheet-preview.png"
-                  alt="Render Hasil Engine Python"
+                  alt="Render Hasil Engine Python - Lembar Kosong Bersih"
                   className="w-full h-full object-contain"
                 />
               </div>

@@ -168,12 +168,15 @@ def plan_answers(pg_count: int) -> list[dict]:
 def render_synthetic(
     template: dict,
     png_path: str | Path,
-    truth_path: str | Path,
+    truth_path: str | Path | None = None,
     px_per_mm: float = DEFAULT_PX_PER_MM,
     noise_sigma: float = 0.0,
     rotate_deg: float = 0.0,
+    fill_answers: bool = True,
 ) -> dict:
-    """Gambar LJK sintetis + tulis ground truth. Kembalikan isi truth."""
+    """Gambar LJK sintetis. Jika fill_answers=False, gambar lembar kosong bersih (unfilled).
+    
+    Jika truth_path disertakan, tulis data ground truth."""
     page_w = _px(template["pageWidthMm"], px_per_mm)
     page_h = _px(template["pageHeightMm"], px_per_mm)
     img = np.full((page_h, page_w, 3), 250, dtype=np.uint8)
@@ -386,12 +389,12 @@ def render_synthetic(
             cv2.LINE_AA,
         )
         plan = truth_by_number[number]
-        marked = set(plan["markedAnswer"] or "")
+        marked = set(plan["markedAnswer"] or "") if fill_answers else set()
         for opt in slot["options"]:
             ox = _px(opt["xMm"], px_per_mm)
             oy = _px(opt["yMm"], px_per_mm)
             cv2.circle(img, (ox, oy), bubble_r, ink, 1, cv2.LINE_AA)
-            if opt["label"] in marked:
+            if fill_answers and opt["label"] in marked:
                 _fill_bubble(img, ox, oy, bubble_r, plan["fillRatio"])
 
     # --- Zona esai: SATU kotak besar, tanpa nomor per soal ---
@@ -451,7 +454,7 @@ def render_synthetic(
             "rotationDeg": rotate_deg,
             "noiseSigma": noise_sigma,
         },
-        "mc": mc_truth,
+        "mc": mc_truth if fill_answers else [],
         # Zona esai tidak bertanda di kertas — hanya satu area kosong.
         # Yang dicatat adalah posisinya: mesin harus memotong tepat di area
         # ini supaya guru bisa membaca tulisan tangan saat menilai.
@@ -461,9 +464,10 @@ def render_synthetic(
             else None
         ),
     }
-    out_truth = Path(truth_path)
-    out_truth.parent.mkdir(parents=True, exist_ok=True)
-    out_truth.write_text(json.dumps(truth, indent=2) + "\n", encoding="utf-8")
+    if truth_path is not None:
+        out_truth = Path(truth_path)
+        out_truth.parent.mkdir(parents=True, exist_ok=True)
+        out_truth.write_text(json.dumps(truth, indent=2) + "\n", encoding="utf-8")
     return truth
 
 
@@ -480,6 +484,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--px-per-mm", type=float, default=DEFAULT_PX_PER_MM)
     parser.add_argument("--noise", type=float, default=0.0, help="sigma derau piksel")
     parser.add_argument("--rotate", type=float, default=0.0, help="rotasi derajat")
+    parser.add_argument(
+        "--blank",
+        action="store_true",
+        help="jika disetel, gambar lembar kosong bersih tanpa isian gelembung (unfilled)",
+    )
     args = parser.parse_args(argv)
 
     out_dir = Path(args.out)
@@ -502,6 +511,7 @@ def main(argv: list[str] | None = None) -> int:
         px_per_mm=args.px_per_mm,
         noise_sigma=args.noise,
         rotate_deg=args.rotate,
+        fill_answers=not args.blank,
     )
 
     print(f"template  : {template_path}")
