@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { calculateFinalGrade, formatFinalScore, type EssayMarkResult, type McQuestionResult } from "@/lib/scoring";
 import { buildTemplateFromExam } from "@/lib/template-builder";
+import { scanSheetWithClientEngine } from "@/lib/omr-engine/client";
 import { EssayMarkRow } from "@/components/scan/essay-mark-row";
 
 export interface BatchEssayMark {
@@ -168,44 +169,23 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
         // Jika memiliki berkas file asli yang diunggah
         if (updated[i].file) {
           try {
-            const formData = new FormData();
-            formData.append("file", updated[i].file!);
-            formData.append(
-              "template",
-              JSON.stringify(templateMeta || {
-                id: "tpl-default-a4",
-                examId: "exam-uts",
-                pageWidthMm: 210,
-                pageHeightMm: 297,
-                columnCount: 3,
-                bubbleDiameterMm: 4.5,
-                bubblePitchMm: 8.5,
-                fiducials: [],
-                nameCropRectMm: { x: 14, y: 30, w: 90, h: 20 },
-                multipleChoiceSlots: [],
-                essayAreaRectMm: { x: 14, y: 195, w: 176, h: 81 },
-              })
-            );
-            formData.append("sourceDevice", "DESKTOP_SCANNER");
+            const dataUrl = updated[i].previewUrl || (await fileToDataUrl(updated[i].file!));
+            const templatePayload = templateMeta || buildTemplateFromExam(examConfig);
 
-            const scanRes = await fetch("/api/scan", {
-              method: "POST",
-              body: formData,
+            const realData = await scanSheetWithClientEngine({
+              imageDataUrl: dataUrl,
+              template: templatePayload,
+              sourceDevice: "DESKTOP_SCANNER",
             });
 
-            if (scanRes.ok) {
-              const realData = await scanRes.json();
-              // Filter nomor soal sesuai jumlah PG yang diatur guru di Ujian & Aturan
-              const filteredMc = (realData.mcAnswers || []).slice(0, activePgCount);
-              result = {
-                ...realData,
-                fullWarpedImageUrl: realData.fullWarpedImageUrl || updated[i].previewUrl || "/sheet-preview.png",
-                mcAnswers: filteredMc,
-              };
-              isRealScanned = true;
-            } else {
-              throw new Error("Engine backend tidak merespons sukses.");
-            }
+            // Filter nomor soal sesuai jumlah PG yang diatur guru di Ujian & Aturan
+            const filteredMc = (realData.mcAnswers || []).slice(0, activePgCount);
+            result = {
+              ...realData,
+              fullWarpedImageUrl: realData.fullWarpedImageUrl || dataUrl || "/sheet-preview.png",
+              mcAnswers: filteredMc,
+            };
+            isRealScanned = true;
           } catch (err: any) {
             console.warn("Gagal memproses via engine, fallback ke simulasi:", err);
             result = generateMockScan(updated[i].filename, i, updated[i].previewUrl);

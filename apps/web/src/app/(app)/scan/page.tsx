@@ -12,6 +12,7 @@ import { useSync } from "@/lib/sync-context";
 import { resizeImageFile } from "@/lib/image-utils";
 import { ExamConfig, GradedStudentRecord, OMRScanResponse, Student } from "@/types/omr";
 import { buildTemplateFromExam } from "@/lib/template-builder";
+import { scanSheetWithClientEngine } from "@/lib/omr-engine/client";
 import { detectFiducialsFromImageData, type CornerFlags } from "@/lib/fiducial-detector";
 import {
   captureHighResFrame,
@@ -232,50 +233,16 @@ export default function ScanPage() {
     }
 
     try {
-      // Jika sedang offline, masukkan langsung ke antrean IndexedDB dan early return (SED2-02)
-      if (!isOnline) {
-        if (!skipQueue) {
-          await addToQueue({
-            examId: examConfig?.id || "active_exam_config",
-            thumbnailDataUrl: imageDataUrl,
-            imageDataUrl,
-          });
-          await refreshQueueCount();
-        }
-        toast.info("Mode Offline: Foto scan disimpan di Antrean IndexedDB untuk disinkronkan nanti.");
-        setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
-        return;
-      }
-
       // Bangun metadata template dinamis dari ujian aktif
       const templatePayload = buildTemplateFromExam(examConfig);
 
-      const res = await fetch("/api/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          template: templatePayload,
-          imageDataUrl,
-          sourceDevice: "MOBILE_CAMERA",
-        }),
+      // Pindai langsung menggunakan Client-Side OpenCV.js Engine (Web Worker)
+      const realData = await scanSheetWithClientEngine({
+        imageDataUrl,
+        template: templatePayload,
+        sourceDevice: "MOBILE_CAMERA",
       });
 
-      if (!res.ok) {
-        let errorMsg = "Gagal memproses via Engine OMR.";
-        try {
-          const errData = await res.json();
-          if (errData.error || errData.detail) {
-            errorMsg = errData.error || errData.detail;
-          }
-        } catch {
-          if (res.status === 503) {
-            errorMsg = "Engine OMR tidak tersedia (503). Pastikan layanan backend aktif.";
-          }
-        }
-        throw new Error(errorMsg);
-      }
-
-      const realData = await res.json();
       const result: OMRScanResponse = {
         ...realData,
         fullWarpedImageUrl: realData.fullWarpedImageUrl || imageDataUrl,
@@ -288,9 +255,22 @@ export default function ScanPage() {
       const errorMsg: string = err?.message || "";
       console.warn("Scan LJK belum berhasil:", errorMsg);
 
+      // Jika offline dan pemrosesan gagal (misal sudut tidak pas), simpan ke antrean lokal
+      if (!isOnline && !skipQueue) {
+        await addToQueue({
+          examId: examConfig?.id || "active_exam_config",
+          thumbnailDataUrl: imageDataUrl,
+          imageDataUrl,
+        });
+        await refreshQueueCount();
+        toast.info("Mode Offline: Foto scan disimpan di Kotak Masuk untuk ditinjau nanti.");
+        setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
+        return;
+      }
+
       if (errorMsg.includes("buram") || errorMsg.includes("laplacian")) {
         toast.warning("Foto terlalu buram / goyang. Dekatkan kamera dan pastikan kertas LJK fokus serta cukup cahaya.");
-      } else if (errorMsg.includes("fiducial") || errorMsg.includes("sudut")) {
+      } else if (errorMsg.includes("fiducial") || errorMsg.includes("sudut") || errorMsg.includes("bingkai")) {
         toast.warning("4 sudut kotak LJK belum pas. Pastikan seluruh batas lembar masuk dalam bingkai.");
       } else {
         toast.error(errorMsg || "Gagal mendeteksi LJK. Pastikan 4 sudut masuk bingkai.");

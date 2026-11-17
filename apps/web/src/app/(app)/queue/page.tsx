@@ -21,6 +21,7 @@ import {
   Student,
 } from "@/types/omr";
 import { buildTemplateFromExam } from "@/lib/template-builder";
+import { scanSheetWithClientEngine } from "@/lib/omr-engine/client";
 import {
   calculateFinalGrade,
   formatFinalScore,
@@ -175,7 +176,7 @@ export default function QueuePage() {
   const ambiguousItems = analyzedItems.filter((a) => a.analysis.statusType === "AMBIGUOUS");
   const offlinePhotoItems = analyzedItems.filter((a) => a.analysis.statusType === "OFFLINE");
 
-  // Sync single item mentah ke OMR Engine via Next.js API route
+  // Sync single item mentah ke OMR Engine (utamakan Client-Side WASM Worker)
   const syncItem = async (item: OfflineQueueItem): Promise<{ ok: boolean; error?: string }> => {
     try {
       await updateQueueItem({ ...item, status: "UPLOADING", attempts: item.attempts + 1 });
@@ -184,35 +185,12 @@ export default function QueuePage() {
       const active = activeExam || (await getActiveExam());
       const template = buildTemplateFromExam(active);
 
-      const res = await fetch("/api/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          template,
-          imageDataUrl: item.imageDataUrl,
-          sourceDevice: "MOBILE_CAMERA",
-        }),
+      const realData = await scanSheetWithClientEngine({
+        imageDataUrl: item.imageDataUrl,
+        template,
+        sourceDevice: "MOBILE_CAMERA",
       });
 
-      if (!res.ok) {
-        let errorDetail = `HTTP ${res.status}`;
-        try {
-          const errJson = await res.json();
-          errorDetail = errJson.error || errJson.detail || errorDetail;
-        } catch {
-          // ignore
-        }
-
-        if (res.status === 400 || res.status === 422) {
-          throw new Error(`Citra tidak valid / 4 sudut fiducial tidak ditemukan (${errorDetail})`);
-        } else if (res.status === 503) {
-          throw new Error("Engine OMR tidak dapat dijangkau (503). Pastikan Engine OMR aktif.");
-        } else {
-          throw new Error(`Engine OMR gagal memproses: ${errorDetail}`);
-        }
-      }
-
-      const realData = await res.json();
       const scanPayload: OMRScanResponse = {
         ...realData,
         fullWarpedImageUrl: realData.fullWarpedImageUrl || item.imageDataUrl,

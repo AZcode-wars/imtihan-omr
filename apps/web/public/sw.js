@@ -9,7 +9,8 @@ const STATIC_ASSETS = [
   "/queue",
   "/grades",
   "/sheet-preview.png",
-  "/template.json"
+  "/template.json",
+  "/wasm/opencv.js"
 ];
 
 self.addEventListener("install", (event) => {
