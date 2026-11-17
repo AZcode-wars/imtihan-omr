@@ -25,7 +25,7 @@ export function AppHeader({
       )}
     >
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 shadow-xs flex items-center justify-center bg-white/10 p-0.5">
+        <div className="h-9 w-9 bg-white rounded-md p-1 shrink-0 shadow-xs flex items-center justify-center">
           <img
             src="/imtihan-logo.svg"
             alt="Logo ImtihanOMR"

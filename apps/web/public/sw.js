@@ -1,4 +1,4 @@
-const CACHE_NAME = "imtihan-omr-shell-v2";
+const CACHE_NAME = "imtihan-omr-shell-v3";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
