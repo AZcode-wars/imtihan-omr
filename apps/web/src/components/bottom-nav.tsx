@@ -59,7 +59,11 @@ export function BottomNav({ queueCount = 0, className }: BottomNavProps) {
                     : "bg-brand-700 text-white hover:bg-brand-800 shadow-brand-700/20 ring-4 ring-white"
                 )}
               >
-                <Icon className="w-7 h-7 stroke-[2.2]" />
+                <img
+                  src="/scan-logo.svg"
+                  alt="Scan LJK"
+                  className="w-8 h-8 object-contain transition-transform duration-200 group-hover:scale-105"
+                />
               </div>
               <span className="sr-only">{item.label}</span>
             </Link>

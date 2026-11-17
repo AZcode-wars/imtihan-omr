@@ -3,6 +3,7 @@ const STATIC_ASSETS = [
   "/",
   "/manifest.json",
   "/imtihan-logo.svg",
+  "/scan-logo.svg",
   "/icon-192.png",
   "/icon-512.png",
   "/apple-touch-icon.png",
