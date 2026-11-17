@@ -9,15 +9,16 @@ import {
   Student,
 } from "@/types/omr";
 import { Button } from "@/components/ui/button";
-import { getActiveExam, saveGradeRecord, getEngineSettings, DEFAULT_ENGINE_SETTINGS } from "@/lib/db";
+import { getActiveExam, saveGradeRecord, getEngineSettings, DEFAULT_ENGINE_SETTINGS, checkStudentScanExists } from "@/lib/db";
 import { toast } from "sonner";
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowRight,
+  Camera,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  FileCheck2,
   FileText,
   Globe,
   Loader2,
@@ -67,6 +68,7 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
   const [examConfig, setExamConfig] = React.useState<ExamConfig | null>(null);
   const [engineSettings, setEngineSettings] =
     React.useState<OMREngineSettings>(DEFAULT_ENGINE_SETTINGS);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
     async function loadConfig() {
@@ -80,7 +82,7 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
   const selectedItem = items[selectedIndex] || null;
   const activePgCount = examConfig?.multipleChoiceQuestions?.length ?? 30;
 
-  // Mock generator hasil scan untuk demo/uji
+  // Mock generator hasil scan untuk fallback darurat jika diperlukan
   const generateMockScan = (filename: string, idx: number, previewUrl?: string): OMRScanResponse => {
     return {
       scanId: `batch-scan-${Date.now()}-${idx}`,
@@ -134,30 +136,6 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
     setItems((prev) => [...prev, ...newItems]);
     setActiveTab("workspace");
     toast.success(`${newItems.length} berkas ditambahkan ke antrean batch`);
-  };
-
-  // Muat Demo 10 Lembar Sekaligus
-  const handleLoadDemoBatch = () => {
-    const demoItems: BatchItem[] = Array.from({ length: 8 }, (_, i) => {
-      const mockResult = generateMockScan(`LJK_Siswa_${i + 1}.jpg`, i);
-      const warnings = mockResult.mcAnswers.filter(
-        (a) => a.status !== "VALID"
-      ).length;
-
-      return {
-        id: `batch-${i + 1}`,
-        filename: `LJK_Kelas8A_${String(i + 1).padStart(2, "0")}.png`,
-        status: "DONE",
-        scanResult: mockResult,
-        selectedStudentId: students[i % students.length]?.id,
-        warningCount: warnings,
-      };
-    });
-
-    setItems(demoItems);
-    setSelectedIndex(0);
-    setActiveTab("workspace");
-    toast.success("8 lembar demo berhasil dimuat ke antrean");
   };
 
   // Proses Semua Antrean Paralel (Mengirim berkas asli ke API Scan Engine)
@@ -337,31 +315,37 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
 
   return (
     <div className="w-full space-y-6">
+      {/* Hidden file input untuk aksi tombol "Unggah" */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,application/pdf"
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = "";
+        }}
+        className="hidden"
+      />
+
       {/* Tab Switcher & Batch Action Header */}
-      <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs min-h-[56px]">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
-            variant={activeTab === "dropzone" ? "secondary" : "ghost"}
+            variant="secondary"
             size="sm"
-            onClick={() => setActiveTab("dropzone")}
-            className="text-xs"
+            onClick={() => fileInputRef.current?.click()}
+            className="text-xs font-semibold gap-1.5 h-9 shrink-0 text-slate-700 hover:text-slate-900 border-slate-200"
           >
-            <Upload className="w-4 h-4 mr-1.5" /> Dropzone Berkas
-          </Button>
-          <Button
-            variant={activeTab === "workspace" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("workspace")}
-            className="text-xs"
-          >
-            <FileCheck2 className="w-4 h-4 mr-1.5" /> Split-Screen Review ({items.length})
+            <Upload className="w-4 h-4 text-brand-700 shrink-0" />
+            <span>Unggah</span>
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           {/* Badge Engine OMR Aktif */}
           <div
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-slate-50 text-slate-700 select-none"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border bg-slate-50 text-slate-700 whitespace-nowrap shrink-0 select-none h-9"
             title={
               engineSettings.mode === "CLIENT_WASM"
                 ? "Engine: In-Browser WASM (OpenCV.js Web Worker)"
@@ -370,35 +354,27 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
           >
             {engineSettings.mode === "CLIENT_WASM" ? (
               <>
-                <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
                 <span className="text-slate-800">Engine: WASM (Offline)</span>
               </>
             ) : (
               <>
-                <Globe className="w-3.5 h-3.5 text-sky-500" />
+                <Globe className="w-3.5 h-3.5 text-sky-500 shrink-0" />
                 <span className="text-slate-800">Engine: Server API</span>
               </>
             )}
           </div>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLoadDemoBatch}
-            className="text-xs text-brand-700 hover:bg-brand-50"
-          >
-            Muat 8 Lembar Demo
-          </Button>
 
           {onSwitchToCamera && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onSwitchToCamera}
-              className="text-xs text-slate-500 hover:text-slate-800"
+              className="text-xs text-slate-600 hover:text-slate-900 gap-1.5 h-9 shrink-0 whitespace-nowrap"
               title="Beralih ke mode bidik kamera"
             >
-              Gunakan Kamera
+              <Camera className="w-3.5 h-3.5 shrink-0" />
+              <span>Gunakan Kamera</span>
             </Button>
           )}
 
@@ -408,10 +384,10 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                 variant="ghost"
                 size="sm"
                 onClick={handleClearAll}
-                className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 flex items-center gap-1.5"
+                className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 gap-1.5 h-9 shrink-0 whitespace-nowrap"
                 title="Hapus semua berkas antrean"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-3.5 h-3.5 shrink-0" />
                 <span>Kosongkan Antrean</span>
               </Button>
 
@@ -419,17 +395,17 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                 size="sm"
                 disabled={isProcessingAll || processedCount === items.length}
                 onClick={handleProcessBatch}
-                className="bg-brand-700 hover:bg-brand-800 text-white font-semibold text-xs shadow-sm flex items-center gap-1.5"
+                className="bg-brand-700 hover:bg-brand-800 text-white font-semibold text-xs shadow-xs gap-1.5 h-9 shrink-0 whitespace-nowrap"
               >
                 {isProcessingAll ? (
                   <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Memproses {processedCount}/{items.length}
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span>Memproses {processedCount}/{items.length}</span>
                   </>
                 ) : (
                   <>
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Proses Semua ({items.length})
+                    <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                    <span>Proses Semua ({items.length})</span>
                   </>
                 )}
               </Button>
@@ -661,14 +637,38 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                       </label>
                       <select
                         value={selectedItem.selectedStudentId || ""}
-                        onChange={(e) => {
+                        onChange={async (e) => {
+                          const stdId = e.target.value;
+                          if (stdId) {
+                            const student = students.find((s) => s.id === stdId);
+                            if (student) {
+                              const check = await checkStudentScanExists(student.name, student.nis, examConfig?.id);
+                              if (check.exists) {
+                                toast.error("nama ini sudah ada!");
+                                toast.warning("Silakan scan kembali dengan nama siswa yang berbeda.");
+                                return;
+                              }
+                              const isDuplicateInBatch = items.some(
+                                (it, idx) => idx !== selectedIndex && it.selectedStudentId === stdId
+                              );
+                              if (isDuplicateInBatch) {
+                                toast.error("nama ini sudah ada!");
+                                toast.warning("Siswa ini sudah dipilih untuk lembar lain di antrean batch.");
+                                return;
+                              }
+                            }
+                          }
                           const updated = [...items];
-                          updated[selectedIndex].selectedStudentId = e.target.value;
+                          updated[selectedIndex].selectedStudentId = stdId;
                           setItems(updated);
                         }}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-medium bg-white focus:outline-hidden focus:ring-2 focus:ring-brand-500"
                       >
-                        <option value="">-- Pilih Siswa Kelas 8A --</option>
+                        <option value="">
+                          {examConfig?.className
+                            ? `-- Pilih Siswa ${examConfig.className.startsWith("Kelas") ? examConfig.className : `Kelas ${examConfig.className}`} --`
+                            : "-- Pilih Siswa --"}
+                        </option>
                         {students.map((std) => (
                           <option key={std.id} value={std.id}>
                             {std.name} ({std.nis})
@@ -917,6 +917,14 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                       const student = students.find((s) => s.id === selectedItem.selectedStudentId);
                       if (!student) {
                         toast.error("Harap pilih nama siswa terlebih dahulu.");
+                        return;
+                      }
+
+                      // Cek duplikasi di IndexedDB (rekap atau antrean)
+                      const check = await checkStudentScanExists(student.name, student.nis, examConfig?.id);
+                      if (check.exists) {
+                        toast.error("nama ini sudah ada!");
+                        toast.warning("Silakan scan kembali dengan nama siswa yang berbeda.");
                         return;
                       }
 

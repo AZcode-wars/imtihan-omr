@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Student } from "@/types/omr";
 import { Button } from "@/components/ui/button";
-import { getAllStudents, addStudent, saveStudents, deleteStudent } from "@/lib/db";
+import { getAllStudents, addStudent, saveStudents, deleteStudent, getActiveExam } from "@/lib/db";
 import { toast } from "sonner";
 import {
   Download,
@@ -26,12 +26,19 @@ export default function StudentsPage() {
   const [newNis, setNewNis] = React.useState("");
   const [newName, setNewName] = React.useState("");
 
-  // Load siswa dari IndexedDB saat mount
+  // Load siswa dan konfigurasi ujian aktif dari IndexedDB saat mount
   React.useEffect(() => {
     async function load() {
       try {
-        const stored = await getAllStudents();
+        const [stored, exam] = await Promise.all([
+          getAllStudents(),
+          getActiveExam(),
+        ]);
         setStudents(stored);
+        if (exam?.className?.trim()) {
+          const cls = exam.className.trim();
+          setSelectedClass(cls.startsWith("Kelas") ? cls : `Kelas ${cls}`);
+        }
       } catch (err) {
         console.warn("Gagal memuat data siswa:", err);
       } finally {

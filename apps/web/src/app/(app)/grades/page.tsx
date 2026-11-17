@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { FilterChips, GradeFilter } from "@/components/grades/filter-chips";
 import { StudentGradeCard, StudentGradeRecord } from "@/components/grades/student-grade-card";
 import { GradeTableDesktop } from "@/components/grades/grade-table-desktop";
-import { getAllGradeRecords, getGradeRecordsByExam, getAllStudents, getActiveExam } from "@/lib/db";
-import { ExamConfig, GradedStudentRecord } from "@/types/omr";
+import { getGradeRecordsByExam, getAllStudents, getActiveExam, deleteGradeRecord, deleteAllGradeRecords } from "@/lib/db";
+import { GradedStudentRecord } from "@/types/omr";
+import { ConfirmDeleteModal } from "@/components/grades/confirm-delete-modal";
 import { toast } from "sonner";
-import { Download, Search, Users } from "lucide-react";
+import { Download, Search, Trash2 } from "lucide-react";
 
 export default function GradesPage() {
   const [records, setRecords] = React.useState<StudentGradeRecord[]>([]);
@@ -19,16 +20,23 @@ export default function GradesPage() {
   const [totalStudentsInClass, setTotalStudentsInClass] = React.useState(0);
   const [passingScore, setPassingScore] = React.useState(75);
   const [examLabel, setExamLabel] = React.useState("UTS Matematika Kelas 8A");
+  const [activeExamId, setActiveExamId] = React.useState("active_exam_config");
+
+  // State Dialog Konfirmasi Hapus
+  const [recordToDelete, setRecordToDelete] = React.useState<StudentGradeRecord | null>(null);
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   // Load data dari IndexedDB saat mount
   React.useEffect(() => {
     async function loadData() {
       try {
         const config = await getActiveExam();
-        const activeExamId = config?.id || "active_exam_config";
+        const currentExamId = config?.id || "active_exam_config";
+        setActiveExamId(currentExamId);
 
         const [gradeRecords, students] = await Promise.all([
-          getGradeRecordsByExam(activeExamId),
+          getGradeRecordsByExam(currentExamId),
           getAllStudents(),
         ]);
 
@@ -150,6 +158,41 @@ export default function GradesPage() {
     };
   }, [records, totalStudentsInClass]);
 
+  const handleConfirmDeleteSingle = async () => {
+    if (!recordToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteGradeRecord(recordToDelete.id);
+      setRecords((prev) => prev.filter((r) => r.id !== recordToDelete.id));
+      if (selectedRecordId === recordToDelete.id) {
+        setSelectedRecordId(null);
+      }
+      toast.success(`Data nilai ${recordToDelete.name} berhasil dihapus.`);
+      setRecordToDelete(null);
+    } catch (err) {
+      console.error("Gagal menghapus nilai:", err);
+      toast.error("Gagal menghapus nilai dari penyimpanan lokal.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleConfirmDeleteAll = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteAllGradeRecords(activeExamId);
+      setRecords([]);
+      setSelectedRecordId(null);
+      toast.success("Semua data nilai berhasil dihapus.");
+      setIsDeleteAllModalOpen(false);
+    } catch (err) {
+      console.error("Gagal menghapus semua nilai:", err);
+      toast.error("Gagal menghapus semua data nilai.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleExportCsv = () => {
     // Format CSV id-ID (titik koma / koma desimal)
     const header = "NIS,Nama Siswa,Skor PG,Maks PG,Skor Esai,Maks Esai,Nilai Akhir,Status\n";
@@ -184,14 +227,28 @@ export default function GradesPage() {
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          onClick={handleExportCsv}
-          className="gap-2 shadow-sm self-start sm:self-auto"
-        >
-          <Download className="w-4 h-4 text-white" />
-          <span>Export CSV Nilai</span>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {records.length > 0 && (
+            <Button
+              variant="ghost"
+              onClick={() => setIsDeleteAllModalOpen(true)}
+              className="gap-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200/60 shadow-2xs h-9 text-xs"
+              title="Hapus semua data nilai yang tersimpan"
+            >
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span>Hapus Semua Data</span>
+            </Button>
+          )}
+
+          <Button
+            variant="primary"
+            onClick={handleExportCsv}
+            className="gap-2 shadow-sm h-9"
+          >
+            <Download className="w-4 h-4 text-white" />
+            <span>Export CSV Nilai</span>
+          </Button>
+        </div>
       </div>
 
       {/* Baris 3 Kartu KPI */}
@@ -250,6 +307,7 @@ export default function GradesPage() {
           records={filteredRecords}
           selectedId={selectedRecordId}
           onSelectRecord={(r) => setSelectedRecordId(r.id)}
+          onDeleteRecord={(r) => setRecordToDelete(r)}
         />
       </div>
 
@@ -267,10 +325,35 @@ export default function GradesPage() {
               key={rec.id}
               record={rec}
               onClick={() => setSelectedRecordId(rec.id)}
+              onDelete={(r) => setRecordToDelete(r)}
             />
           ))
         )}
       </div>
+
+      {/* Modal Konfirmasi Hapus Per Nilai */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(recordToDelete)}
+        onClose={() => setRecordToDelete(null)}
+        onConfirm={handleConfirmDeleteSingle}
+        title="Hapus Data Nilai Siswa?"
+        description="Data nilai siswa ini akan dihapus dari IndexedDB."
+        studentName={recordToDelete?.name}
+        nis={recordToDelete?.nis}
+        confirmLabel="Ya, Hapus Nilai"
+        isDeleting={isDeleting}
+      />
+
+      {/* Modal Konfirmasi Hapus Semua Data Nilai */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteAllModalOpen}
+        onClose={() => setIsDeleteAllModalOpen(false)}
+        onConfirm={handleConfirmDeleteAll}
+        title="Hapus Semua Data Nilai?"
+        description={`Seluruh ${records.length} data rekap nilai ujian ini akan dihapus dari IndexedDB.`}
+        confirmLabel="Ya, Hapus Semua Data"
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }

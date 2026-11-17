@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
+import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface StudentGradeRecord {
@@ -21,12 +22,14 @@ export interface StudentGradeRecord {
 export interface StudentGradeCardProps {
   record: StudentGradeRecord;
   onClick?: () => void;
+  onDelete?: (record: StudentGradeRecord) => void;
   className?: string;
 }
 
 export function StudentGradeCard({
   record,
   onClick,
+  onDelete,
   className,
 }: StudentGradeCardProps) {
   return (
@@ -38,17 +41,33 @@ export function StudentGradeCard({
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <div>
-          <h4 className="text-sm font-bold text-slate-800 leading-tight">
+        <div className="min-w-0">
+          <h4 className="text-sm font-bold text-slate-800 leading-tight truncate">
             {record.name}
           </h4>
           <span className="text-[11px] font-semibold text-slate-400 tabular-nums">
-            NIS: {record.nis}
+            NIS: {record.nis || "-"}
           </span>
         </div>
-        <Badge variant={record.isPassing ? "pass" : "remedial"}>
-          {record.isPassing ? "● Lulus" : "● Remedial"}
-        </Badge>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Badge variant={record.isPassing ? "pass" : "remedial"}>
+            {record.isPassing ? "● Lulus" : "● Remedial"}
+          </Badge>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(record);
+              }}
+              aria-label={`Hapus nilai ${record.name}`}
+              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+              title="Hapus data nilai siswa ini"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-end justify-between border-t border-slate-100 pt-2 text-xs">

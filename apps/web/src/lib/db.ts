@@ -322,6 +322,82 @@ export async function deleteGradeRecord(recordId: string): Promise<void> {
   });
 }
 
+export async function deleteAllGradeRecords(examId?: string): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.GRADES, "readwrite");
+    const store = tx.objectStore(STORES.GRADES);
+    if (!examId) {
+      const req = store.clear();
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    } else {
+      const index = store.index("by_examId");
+      const req = index.openKeyCursor(IDBKeyRange.only(examId));
+      req.onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest<IDBCursor>).result;
+        if (cursor) {
+          store.delete(cursor.primaryKey);
+          cursor.continue();
+        } else {
+          resolve();
+        }
+      };
+      req.onerror = () => reject(req.error);
+    }
+  });
+}
+
+/**
+ * Memeriksa apakah siswa dengan nama dan NIS yang sama sudah terdaftar di antrean atau rekap nilai.
+ */
+export async function checkStudentScanExists(
+  studentName: string,
+  studentNis: string,
+  examId?: string
+): Promise<{ exists: boolean; where?: "antrean" | "rekap" }> {
+  const nameNorm = studentName.trim().toLowerCase();
+  const nisNorm = studentNis.trim();
+
+  if (!nameNorm && !nisNorm) return { exists: false };
+
+  try {
+    // 1. Cek di Rekap Nilai (grades)
+    const allGrades = examId ? await getGradeRecordsByExam(examId) : await getAllGradeRecords();
+    const students = await getAllStudents();
+    const studentMap = new Map(students.map((s) => [s.id, s]));
+
+    const gradeMatch = allGrades.some((g) => {
+      const std = studentMap.get(g.studentId);
+      const gNis = (std?.nis || "").trim();
+      const gName = (g.studentName || "").trim().toLowerCase();
+      return gName === nameNorm && (nisNorm ? gNis === nisNorm : true);
+    });
+
+    if (gradeMatch) {
+      return { exists: true, where: "rekap" };
+    }
+
+    // 2. Cek di Antrean (scans_queue)
+    const queue = await getQueueItems();
+    const queueMatch = queue.some((q) => {
+      if (examId && q.examId && q.examId !== examId) return false;
+      const std = q.selectedStudentId ? studentMap.get(q.selectedStudentId) : null;
+      const qName = (q.selectedStudentName || std?.name || "").trim().toLowerCase();
+      const qNis = (std?.nis || "").trim();
+      return qName === nameNorm && (nisNorm ? qNis === nisNorm : true);
+    });
+
+    if (queueMatch) {
+      return { exists: true, where: "antrean" };
+    }
+  } catch (err) {
+    console.warn("Gagal mengecek duplikasi siswa:", err);
+  }
+
+  return { exists: false };
+}
+
 export async function deleteStudent(studentId: string): Promise<void> {
   const db = await getDB();
   return new Promise((resolve, reject) => {

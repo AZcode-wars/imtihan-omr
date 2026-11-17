@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
+import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StudentGradeRecord } from "./student-grade-card";
 
@@ -9,6 +10,7 @@ export interface GradeTableDesktopProps {
   records: StudentGradeRecord[];
   selectedId?: string | null;
   onSelectRecord?: (record: StudentGradeRecord) => void;
+  onDeleteRecord?: (record: StudentGradeRecord) => void;
   className?: string;
 }
 
@@ -16,6 +18,7 @@ export function GradeTableDesktop({
   records,
   selectedId,
   onSelectRecord,
+  onDeleteRecord,
   className,
 }: GradeTableDesktopProps) {
   return (
@@ -36,6 +39,9 @@ export function GradeTableDesktop({
               <th className="px-5 py-3 w-32 text-right">Skor Esai</th>
               <th className="px-5 py-3 w-32 text-right">Nilai Akhir</th>
               <th className="px-5 py-3 w-28 text-center">Status</th>
+              {onDeleteRecord && (
+                <th className="px-4 py-3 w-16 text-center">Aksi</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
@@ -92,6 +98,22 @@ export function GradeTableDesktop({
                       {record.isPassing ? "Lulus" : "Remedial"}
                     </Badge>
                   </td>
+                  {onDeleteRecord && (
+                    <td
+                      className="px-4 py-3 text-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onDeleteRecord(record)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title={`Hapus nilai ${record.name}`}
+                        aria-label={`Hapus nilai ${record.name}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}

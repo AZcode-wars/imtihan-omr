@@ -14,6 +14,7 @@ import {
   saveGradeRecord,
   getEngineSettings,
   DEFAULT_ENGINE_SETTINGS,
+  checkStudentScanExists,
 } from "@/lib/db";
 import { useSync } from "@/lib/sync-context";
 import { resizeImageFile } from "@/lib/image-utils";
@@ -371,6 +372,17 @@ export default function ScanPage() {
 
   // Simpan hasil verifikasi & lanjut lembar berikutnya jika batch
   const handleSaveVerify = async (record: any) => {
+    // Cek duplikasi di IndexedDB (rekap atau antrean)
+    const student = students.find((s) => s.id === record.studentId);
+    if (student) {
+      const check = await checkStudentScanExists(student.name, student.nis, examConfig?.id);
+      if (check.exists) {
+        toast.error("nama ini sudah ada!");
+        toast.warning("Silakan scan kembali dengan nama siswa yang berbeda.");
+        return;
+      }
+    }
+
     // Persist ke IndexedDB
     try {
       const gradeRecord: GradedStudentRecord = {

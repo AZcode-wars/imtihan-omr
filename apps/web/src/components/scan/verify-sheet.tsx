@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 import { ExceptionChip } from "@/components/ui/exception-chip";
 import { EssayMarkRow } from "@/components/scan/essay-mark-row";
-import { getActiveExam } from "@/lib/db";
+import { getActiveExam, checkStudentScanExists } from "@/lib/db";
 import {
   calculateFinalGrade,
   formatFinalScore,
@@ -63,6 +63,7 @@ export function VerifySheet({
   const [selectedStudentId, setSelectedStudentId] = React.useState<string>(
     initialStudentId || students[0]?.id || ""
   );
+  const [duplicateWarning, setDuplicateWarning] = React.useState<string | null>(null);
   const [examConfig, setExamConfig] = React.useState<ExamConfig | null>(null);
 
   React.useEffect(() => {
@@ -72,6 +73,36 @@ export function VerifySheet({
     }
     loadConfig();
   }, []);
+
+  // Cek jika siswa yang dipilih sudah memiliki data nilai di antrean atau rekap
+  React.useEffect(() => {
+    let isCancelled = false;
+    async function checkDuplicate() {
+      if (!selectedStudentId) {
+        setDuplicateWarning(null);
+        return;
+      }
+      const student = students.find((s) => s.id === selectedStudentId);
+      if (!student) {
+        setDuplicateWarning(null);
+        return;
+      }
+      const check = await checkStudentScanExists(student.name, student.nis, examConfig?.id);
+      if (!isCancelled) {
+        if (check.exists) {
+          setDuplicateWarning(
+            `nama ini sudah ada! Siswa ${student.name} (${student.nis}) sudah terdaftar di ${check.where === "rekap" ? "rekap nilai" : "antrean scan"}. Silakan scan kembali dengan nama siswa yang berbeda.`
+          );
+        } else {
+          setDuplicateWarning(null);
+        }
+      }
+    }
+    checkDuplicate();
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedStudentId, students, examConfig?.id]);
 
   // Filter nomor jawaban sesuai soal aktif
   const activePgCount = examConfig?.multipleChoiceQuestions?.length ?? scanResult.mcAnswers.length;
@@ -202,15 +233,23 @@ export function VerifySheet({
   const formattedScore = formatFinalScore(scoreSummary);
   const selectedStudent = students.find((s) => s.id === selectedStudentId);
 
-  const handleSaveRecord = () => {
+  const handleSaveRecord = async () => {
     if (!selectedStudent) {
       toast.error("Harap pilih nama siswa terlebih dahulu.");
       return;
     }
 
+    // Cek duplikasi di IndexedDB (rekap atau antrean)
+    const check = await checkStudentScanExists(selectedStudent.name, selectedStudent.nis, examConfig?.id);
+    if (check.exists) {
+      toast.error("nama ini sudah ada!");
+      toast.warning("Silakan scan kembali dengan nama siswa yang berbeda.");
+      return;
+    }
+
     const record = {
       recordId: `rec-${Date.now()}`,
-      examId: "exam-1",
+      examId: examConfig?.id || "active_exam_config",
       studentId: selectedStudent.id,
       studentName: selectedStudent.name,
       rawMCScore: scoreSummary.mcPoints,
@@ -230,8 +269,17 @@ export function VerifySheet({
     toast.success(`Nilai ${selectedStudent.name} (${formattedScore}) berhasil disimpan!`);
   };
 
-  const handleSaveToQueue = () => {
+  const handleSaveToQueue = async () => {
     if (onSaveToQueue) {
+      if (selectedStudent) {
+        const check = await checkStudentScanExists(selectedStudent.name, selectedStudent.nis, examConfig?.id);
+        if (check.exists) {
+          toast.error("nama ini sudah ada!");
+          toast.warning("Silakan scan kembali dengan nama siswa yang berbeda.");
+          return;
+        }
+      }
+
       onSaveToQueue({
         scanResult: {
           ...scanResult,
@@ -312,7 +360,12 @@ export function VerifySheet({
                 aria-label="Pilih siswa pemilik lembar"
                 value={selectedStudentId}
                 onChange={(e) => setSelectedStudentId(e.target.value)}
-                className="w-full h-10 sm:h-11 px-3 rounded-xl border-2 border-brand-700/40 bg-white font-bold text-slate-800 text-xs sm:text-sm focus:outline-none focus:border-brand-700"
+                className={cn(
+                  "w-full h-10 sm:h-11 px-3 rounded-xl border-2 bg-white font-bold text-slate-800 text-xs sm:text-sm focus:outline-none",
+                  duplicateWarning
+                    ? "border-rose-500 focus:border-rose-600 bg-rose-50/20"
+                    : "border-brand-700/40 focus:border-brand-700"
+                )}
               >
                 {students.map((std) => (
                   <option key={std.id} value={std.id}>
@@ -320,6 +373,18 @@ export function VerifySheet({
                   </option>
                 ))}
               </select>
+
+              {duplicateWarning && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-bold block">nama ini sudah ada!</strong>
+                    <p className="mt-0.5 text-rose-700">
+                      Siswa ini sudah memiliki data nilai di antrean atau rekap. Silakan scan kembali dengan nama siswa yang berbeda.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 

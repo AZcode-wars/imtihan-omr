@@ -121,21 +121,23 @@ export default function SetupPage() {
     loadSavedConfig();
   }, []);
 
-  // Sinkronisasi jumlah kunci saat pgCount berubah
-  React.useEffect(() => {
+  // Ubah jumlah soal PG dan sinkronisasi kunci jawaban secara langsung
+  const handlePgCountChange = (val: number) => {
+    const count = Math.min(30, Math.max(1, val));
+    setPgCount(count);
     setAnswers((prev) => {
-      if (prev.length === pgCount) return prev;
-      if (prev.length < pgCount) {
-        const added = Array.from({ length: pgCount - prev.length }, (_, i) => ({
+      if (prev.length === count) return prev;
+      if (prev.length < count) {
+        const added = Array.from({ length: count - prev.length }, (_, i) => ({
           questionNumber: prev.length + i + 1,
           key: (["A", "B", "C", "D"] as OptionLabel[])[(prev.length + i) % 4],
           status: "ACTIVE" as QuestionStatus,
         }));
         return [...prev, ...added];
       }
-      return prev.slice(0, pgCount);
+      return prev.slice(0, count);
     });
-  }, [pgCount]);
+  };
 
   // Modal editor kunci per nomor
   const [selectedQuestion, setSelectedQuestion] = React.useState<number | null>(null);
@@ -353,7 +355,7 @@ export default function SetupPage() {
             max={30}
             step={1}
             helper="Kapasitas Lembar A4 Standar: maksimum 30 soal PG"
-            onChange={(val) => setPgCount(Math.min(30, Math.max(1, val)))}
+            onChange={handlePgCountChange}
           />
           <Stepper
             label="Soal Esai (Zona Tunggal)"

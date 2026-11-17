@@ -11,6 +11,7 @@ import {
   getActiveExam,
   saveGradeRecord,
   getAllStudents,
+  checkStudentScanExists,
 } from "@/lib/db";
 import { useSync } from "@/lib/sync-context";
 import {
@@ -297,9 +298,18 @@ export default function QueuePage() {
         students.find((s) => s.id === item.selectedStudentId) || students[0];
       const studentId = matchedStudent?.id || item.selectedStudentId || `std-${Date.now()}`;
       const studentName = matchedStudent?.name || item.selectedStudentName || "Siswa Tanpa Nama";
+      const studentNis = matchedStudent?.nis || "";
 
       const recordId = `rec-${item.id.replace(/^queue-/, "")}`;
       const examId = item.examId || active?.id || "active_exam_config";
+
+      // Cek duplikasi di IndexedDB (rekap)
+      const check = await checkStudentScanExists(studentName, studentNis, examId);
+      if (check.exists && check.where === "rekap") {
+        toast.error("nama ini sudah ada!");
+        toast.warning("Silakan scan kembali dengan nama siswa yang berbeda.");
+        return;
+      }
 
       const gradeRecord: GradedStudentRecord = {
         recordId,
