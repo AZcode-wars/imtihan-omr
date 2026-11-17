@@ -248,13 +248,13 @@ export function VerifySheet({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-none max-h-[94vh] flex flex-col shadow-sheet overflow-hidden max-w-2xl w-full mx-auto animate-in slide-in-from-bottom duration-300">
+    <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center bg-slate-950/75 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden max-w-2xl w-full mx-auto animate-in slide-in-from-bottom duration-300">
         {/* Header Sheet */}
-        <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
+        <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-brand-600 animate-pulse" />
-            <h2 className="text-base font-bold text-slate-800">
+            <h2 className="text-sm sm:text-base font-bold text-slate-800">
               Verifikasi Hasil Scan LJK
             </h2>
           </div>
@@ -269,20 +269,20 @@ export function VerifySheet({
         </div>
 
         {/* Body Scrollable */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4 sm:space-y-6">
           {/* Zona 1: Potongan Nama Siswa */}
           <section className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                 Potongan Tulisan Nama (Auto-Crop)
               </span>
-              <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2.5 py-0.5 rounded-full">
+              <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2.5 py-0.5 rounded-full shrink-0">
                 Sisa {students.length} Siswa
               </span>
             </div>
 
-            <div className="bg-[#FCFCF9] border border-dashed border-slate-300 rounded-xl p-3 shadow-inner flex items-center justify-between">
-              <div>
+            <div className="bg-[#FCFCF9] border border-dashed border-slate-300 rounded-xl p-3 shadow-inner flex flex-col xs:flex-row xs:items-center justify-between gap-2.5">
+              <div className="min-w-0">
                 <p className="text-[9px] font-mono text-slate-400 uppercase">
                   Nama Terpotong di LJK:
                 </p>
@@ -290,7 +290,7 @@ export function VerifySheet({
                   <img
                     src={scanResult.studentNameCropUrl}
                     alt="Potongan Nama"
-                    className="h-10 object-contain rounded mt-1 border border-slate-200"
+                    className="h-9 sm:h-10 max-w-full object-contain rounded mt-1 border border-slate-200"
                   />
                 ) : (
                   <p className="text-xs text-slate-400 italic py-1 mt-0.5">
@@ -298,7 +298,7 @@ export function VerifySheet({
                   </p>
                 )}
               </div>
-              <span className="text-[10px] font-mono text-slate-500 px-2 py-1 rounded bg-slate-100">
+              <span className="text-[10px] font-mono text-slate-500 px-2 py-1 rounded bg-slate-100 self-start xs:self-auto shrink-0">
                 {examConfig?.className || "Kelas Aktif"}
               </span>
             </div>
@@ -312,7 +312,7 @@ export function VerifySheet({
                 aria-label="Pilih siswa pemilik lembar"
                 value={selectedStudentId}
                 onChange={(e) => setSelectedStudentId(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl border-2 border-brand-700/40 bg-white font-bold text-slate-800 text-sm focus:outline-none focus:border-brand-700"
+                className="w-full h-10 sm:h-11 px-3 rounded-xl border-2 border-brand-700/40 bg-white font-bold text-slate-800 text-xs sm:text-sm focus:outline-none focus:border-brand-700"
               >
                 {students.map((std) => (
                   <option key={std.id} value={std.id}>
@@ -324,26 +324,26 @@ export function VerifySheet({
           </section>
 
           {/* Zona 2: Ringkasan Skor Live */}
-          <section className="bg-gradient-to-br from-brand-800 to-brand-700 rounded-2xl p-4 text-white shadow-raised flex items-center justify-between">
-            <div className="space-y-1.5">
+          <section className="bg-gradient-to-br from-brand-800 to-brand-700 rounded-2xl p-3.5 sm:p-4 text-white shadow-raised flex flex-col xs:flex-row items-start xs:items-center justify-between gap-3">
+            <div className="space-y-1 sm:space-y-1.5">
               <span className="text-[11px] text-brand-100/80 font-medium">
                 Ringkasan Skor Terbaca
               </span>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-md bg-white/15 text-xs font-bold">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md bg-white/15 text-xs font-bold">
                   PG: {scoreSummary.mcPoints}/{scoreSummary.mcMaxPoints}
                 </span>
-                <span className="px-2.5 py-1 rounded-md bg-white/15 text-xs font-bold">
+                <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md bg-white/15 text-xs font-bold">
                   Esai: {scoreSummary.essayPoints}/{scoreSummary.essayMaxPoints}
                 </span>
               </div>
             </div>
 
-            <div className="text-right">
+            <div className="text-left xs:text-right self-end xs:self-auto">
               <span className="text-[10px] font-bold tracking-wider uppercase text-brand-200 block">
                 Nilai Akhir
               </span>
-              <span className="text-3xl font-extrabold tracking-tight tabular-nums">
+              <span className="text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums">
                 {formattedScore}
               </span>
             </div>
@@ -351,14 +351,14 @@ export function VerifySheet({
 
           {/* Zona 3: Pemeriksaan Jawaban Siswa (Benar / Salah) */}
           <section className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-1.5 sm:gap-2">
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 <h3 className="text-xs font-bold text-slate-800">
                   Rincian Jawaban Siswa ({mcAnswers.length} Soal PG)
                 </h3>
               </div>
-              <div className="flex items-center gap-2 text-[11px] font-medium">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] font-medium">
                 <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   Benar: {mcQuestionsInput.filter((q) => q.status === "ACTIVE" && q.selectedOption === q.correctAnswer).length}
@@ -371,7 +371,7 @@ export function VerifySheet({
             </div>
 
             {/* Grid Kartu Jawaban Soal: Terbaca vs Kunci */}
-            <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
+            <div className="grid grid-cols-4 xs:grid-cols-5 sm:grid-cols-6 gap-1.5 sm:gap-2">
               {mcAnswers.map((ans) => {
                 const configItem = examConfig?.multipleChoiceQuestions?.find(
                   (q) => q.number === ans.questionNumber
@@ -391,7 +391,7 @@ export function VerifySheet({
                       )
                     }
                     className={cn(
-                      "p-2 rounded-xl border text-center transition-all cursor-pointer select-none flex flex-col items-center justify-center relative active:scale-95",
+                      "p-1.5 sm:p-2 rounded-xl border text-center transition-all cursor-pointer select-none flex flex-col items-center justify-center relative active:scale-95",
                       isCorrect
                         ? "bg-emerald-50/90 border-emerald-300 text-emerald-950 hover:bg-emerald-100/70"
                         : isWrong
@@ -402,20 +402,20 @@ export function VerifySheet({
                     )}
                     title={`Soal #${ans.questionNumber} · Klik untuk koreksi manual`}
                   >
-                    <div className="flex items-center justify-between w-full px-0.5 text-[10px] font-bold text-slate-500">
+                    <div className="flex items-center justify-between w-full px-0.5 text-[9px] sm:text-[10px] font-bold text-slate-500">
                       <span>#{ans.questionNumber}</span>
                       {isCorrect ? (
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-600" />
                       ) : isWrong ? (
-                        <XCircle className="w-3 h-3 text-rose-600" />
+                        <XCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-rose-600" />
                       ) : (
-                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                        <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-600" />
                       )}
                     </div>
-                    <span className="text-base font-extrabold font-mono my-0.5">
+                    <span className="text-sm sm:text-base font-extrabold font-mono my-0.5">
                       {ans.selectedOption || "-"}
                     </span>
-                    <span className="text-[10px] font-semibold opacity-75">
+                    <span className="text-[9px] sm:text-[10px] font-semibold opacity-75">
                       Kunci: {correctKey}
                     </span>
                   </button>
@@ -425,7 +425,7 @@ export function VerifySheet({
 
             {/* Exception Note jika ada nomor ambigu/kosong */}
             {problemAnswers.length > 0 && (
-              <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] sm:text-xs text-amber-900 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                   <span>
@@ -437,7 +437,7 @@ export function VerifySheet({
 
             {/* Inline Editor Koreksi Cepat */}
             {activeCorrectionQuestion !== null && (
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 animate-in fade-in duration-150">
+              <div className="p-3 sm:p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 sm:space-y-3 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-slate-800">
                     Koreksi Jawaban Soal #{activeCorrectionQuestion}
@@ -452,7 +452,7 @@ export function VerifySheet({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                   {BUBBLE_OPTIONS.map((opt) => (
                     <button
                       key={opt}
@@ -461,9 +461,9 @@ export function VerifySheet({
                         handleCorrectBubble(activeCorrectionQuestion, opt)
                       }
                       className={cn(
-                        "h-11 rounded-xl font-bold border transition-all active:scale-95 cursor-pointer text-sm",
+                        "h-9 sm:h-11 rounded-lg sm:rounded-xl font-bold border transition-all active:scale-95 cursor-pointer text-xs sm:text-sm",
                         opt === "EMPTY"
-                          ? "bg-white text-rose-700 border-rose-200 hover:bg-rose-50 text-xs"
+                          ? "bg-white text-rose-700 border-rose-200 hover:bg-rose-50 text-[11px] sm:text-xs"
                           : "bg-white text-slate-800 border-slate-200 hover:border-brand-700 hover:bg-brand-50"
                       )}
                     >
@@ -490,7 +490,7 @@ export function VerifySheet({
                 <img
                   src={scanResult.essayAreaCropUrl}
                   alt="Area Esai"
-                  className="w-full max-h-48 object-contain rounded-xl border border-slate-200 bg-white"
+                  className="w-full max-h-36 sm:max-h-48 object-contain rounded-xl border border-slate-200 bg-white"
                 />
               </div>
             )}
@@ -514,14 +514,14 @@ export function VerifySheet({
         </div>
 
         {/* Footer Sheet Sticky - Dual Action */}
-        <div className="p-4 border-t border-slate-100 bg-white shrink-0 flex flex-col sm:flex-row items-center gap-2.5">
+        <div className="p-3 sm:p-4 border-t border-slate-100 bg-white shrink-0 flex flex-col sm:flex-row items-center gap-2 pb-[max(12px,env(safe-area-inset-bottom))]">
           {onSaveToQueue && (
             <Button
               type="button"
               variant="secondary"
-              size="lg"
+              size="md"
               onClick={handleSaveToQueue}
-              className="w-full sm:w-1/2 gap-2 text-sm font-bold border-brand-200 text-brand-800 hover:bg-brand-50"
+              className="w-full sm:w-1/2 gap-1.5 text-xs sm:text-sm font-bold border-brand-200 text-brand-800 hover:bg-brand-50 h-10 sm:h-11"
             >
               <Clock className="w-4 h-4 text-brand-600" />
               <span>Simpan ke Antrean & Lanjut</span>
@@ -530,10 +530,10 @@ export function VerifySheet({
           <Button
             type="button"
             variant="primary"
-            size="lg"
+            size="md"
             onClick={handleSaveRecord}
             className={cn(
-              "w-full gap-2 text-sm sm:text-base font-bold",
+              "w-full gap-1.5 text-xs sm:text-sm font-bold h-10 sm:h-11",
               onSaveToQueue ? "sm:w-1/2" : "w-full"
             )}
           >

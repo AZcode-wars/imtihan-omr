@@ -444,7 +444,7 @@ export default function ScanPage() {
             )}
           />
 
-          {/* Overlay Atas: Tombol Keluar, Status Siswa, Toggle Auto-Shutter, Upload, Senter */}
+          {/* Overlay Atas: Tombol Keluar, Status Siswa, Engine Badge, Upload, Senter */}
           <div className="relative z-20 flex items-center justify-between p-3 sm:p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent pt-[max(12px,env(safe-area-inset-top))]">
             <div className="flex items-center gap-2">
               <button
@@ -472,52 +472,30 @@ export default function ScanPage() {
                   </strong>
                 </span>
               </div>
+            </div>
 
-              {/* Indikator Mode Engine OMR Aktif */}
+            <div className="flex items-center gap-2">
+              {/* Indikator Mode Engine OMR Aktif (Menggantikan tombol Online) */}
               <div
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white select-none"
+                className="min-h-[44px] px-3 rounded-full flex items-center gap-1.5 backdrop-blur-md border border-white/20 bg-black/60 text-xs font-semibold select-none text-white shadow-sm"
                 title={
                   engineSettings.mode === "CLIENT_WASM"
-                    ? "Engine: In-Browser WASM (OpenCV.js Web Worker)"
-                    : `Engine: Server API (${engineSettings.serverUrl})`
+                    ? "Engine OMR: In-Browser WASM (Klien / Offline)"
+                    : `Engine OMR: Server API (${engineSettings.serverUrl})`
                 }
               >
                 {engineSettings.mode === "CLIENT_WASM" ? (
                   <>
                     <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                    <span className="text-[11px] font-semibold text-amber-200">WASM</span>
+                    <span className="text-amber-200">WASM</span>
                   </>
                 ) : (
                   <>
                     <Globe className="w-3.5 h-3.5 text-sky-400" />
-                    <span className="text-[11px] font-semibold text-sky-200">Server</span>
+                    <span className="text-sky-200">Server</span>
                   </>
                 )}
               </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Toggle Online / Offline Terintegrasi di Overlay Kamera Mobile */}
-              <button
-                type="button"
-                onClick={toggleSimulationOnline}
-                title="Klik untuk simulasi mode online/offline"
-                aria-label={isOnline ? "Status: Online (Klik untuk beralih offline)" : "Status: Offline (Klik untuk beralih online)"}
-                className={cn(
-                  "min-h-[44px] px-3 rounded-full flex items-center gap-1.5 backdrop-blur-md border text-xs font-semibold cursor-pointer transition-colors",
-                  isOnline
-                    ? "bg-black/60 text-white border-white/20 hover:bg-black/80"
-                    : "bg-amber-500/90 text-slate-950 border-amber-300 font-bold shadow-md"
-                )}
-              >
-                <span
-                  className={cn(
-                    "w-2 h-2 rounded-full",
-                    isOnline ? "bg-emerald-400 animate-pulse" : "bg-slate-950"
-                  )}
-                />
-                <span>{isOnline ? "Online" : "Offline"}</span>
-              </button>
 
               {/* Tombol Upload Batch File LJK */}
               <label

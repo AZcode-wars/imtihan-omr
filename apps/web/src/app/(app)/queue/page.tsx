@@ -453,25 +453,25 @@ export default function QueuePage() {
         </div>
 
         {/* Action Tambah Simulasi & Kosongkan */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <Button
             variant="secondary"
             size="sm"
             onClick={() => handleAddDemoItem("issue")}
-            className="flex items-center gap-1.5 text-xs"
+            className="flex items-center gap-1.5 text-xs h-8 sm:h-9"
             title="Tambah lembar simulasi yang perlu review"
           >
-            <Plus className="w-3.5 h-3.5" /> + Review Esai/Ragu
+            <Plus className="w-3.5 h-3.5" /> <span>+ Review Esai</span>
           </Button>
 
           <Button
             variant="secondary"
             size="sm"
             onClick={() => handleAddDemoItem("ready")}
-            className="flex items-center gap-1.5 text-xs text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
+            className="flex items-center gap-1.5 text-xs text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 h-8 sm:h-9"
             title="Tambah lembar simulasi bersih siap setujui"
           >
-            <Check className="w-3.5 h-3.5" /> + Siap Disetujui
+            <Check className="w-3.5 h-3.5" /> <span>+ Siap Setujui</span>
           </Button>
 
           {items.length > 0 && (
@@ -479,9 +479,9 @@ export default function QueuePage() {
               variant="ghost"
               size="sm"
               onClick={handleClearAll}
-              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-xs"
+              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-xs h-8 sm:h-9"
             >
-              <Trash2 className="w-4 h-4 mr-1" /> Kosongkan
+              <Trash2 className="w-3.5 h-3.5 mr-1" /> Kosongkan
             </Button>
           )}
         </div>
@@ -549,14 +549,14 @@ export default function QueuePage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto shrink-0">
             {offlinePhotoItems.length > 0 && (
               <Button
                 variant="secondary"
                 size="md"
                 disabled={!isOnline || isSyncingAll}
                 onClick={handleSyncAllOffline}
-                className="bg-white/15 border-white/25 text-white hover:bg-white/25 text-xs font-bold"
+                className="bg-white/15 border-white/25 text-white hover:bg-white/25 text-xs font-bold w-full sm:w-auto justify-center"
               >
                 {isSyncingAll ? (
                   <>
@@ -576,7 +576,7 @@ export default function QueuePage() {
               size="md"
               disabled={readyItems.length === 0 || isApprovingAll}
               onClick={handleApproveAllReady}
-              className="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold shadow-md text-xs sm:text-sm px-4"
+              className="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold shadow-md text-xs sm:text-sm px-4 w-full sm:w-auto justify-center"
             >
               {isApprovingAll ? (
                 <>
@@ -601,7 +601,7 @@ export default function QueuePage() {
           <p className="text-sm font-medium">Memuat data kotak masuk koreksi...</p>
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center flex flex-col items-center justify-center shadow-xs">
+        <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-12 text-center flex flex-col items-center justify-center shadow-xs">
           <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
             <CheckCircle2 className="w-9 h-9 stroke-[1.8]" />
           </div>
@@ -610,7 +610,7 @@ export default function QueuePage() {
             Tidak ada lembar hasil scan yang tertunda. Semua LJK yang dipindai telah selesai ditinjau
             dan nilainya tersimpan rapi di Rekap Nilai.
           </p>
-          <div className="mt-6 flex items-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
             <Button
               variant="primary"
               size="md"
@@ -646,11 +646,11 @@ export default function QueuePage() {
             return (
               <div
                 key={item.id}
-                className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/70 transition-colors"
+                className="p-3.5 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-slate-50/70 transition-colors"
               >
                 {/* Kolom Kiri: Thumbnail & Metadata */}
-                <div className="flex items-start gap-4 min-w-0">
-                  <div className="w-14 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 relative shadow-2xs">
+                <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+                  <div className="w-12 h-14 sm:w-14 sm:h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 relative shadow-2xs">
                     {item.thumbnailDataUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -663,9 +663,9 @@ export default function QueuePage() {
                     )}
                   </div>
 
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-extrabold text-sm text-slate-800 truncate">
+                  <div className="min-w-0 space-y-1 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span className="font-extrabold text-sm text-slate-800 truncate max-w-[200px] sm:max-w-none">
                         {studentName}
                       </span>
 
@@ -695,11 +695,13 @@ export default function QueuePage() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{timeStr}</span>
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        <span>{timeStr}</span>
+                      </span>
                       <span>·</span>
-                      <span className="truncate">{activeExamTitle}</span>
+                      <span className="truncate max-w-[130px] sm:max-w-xs">{activeExamTitle}</span>
                       <span>·</span>
                       <span className="font-mono text-[10px] text-slate-400">{item.id}</span>
                     </div>
@@ -713,68 +715,70 @@ export default function QueuePage() {
                 </div>
 
                 {/* Kolom Kanan: Actions */}
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                  {/* Tombol Periksa Lembar (Membuka VerifySheet) */}
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      if (!item.scanResult) {
-                        toast.info("Memproses citra lembar via OMR...");
-                        syncItem(item);
-                      } else {
-                        setReviewingItem(item);
-                      }
-                    }}
-                    className="h-9 px-3 gap-1.5 text-xs font-bold"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Periksa Lembar</span>
-                  </Button>
-
-                  {/* Tombol Cepat Setujui jika status READY */}
-                  {analysis.statusType === "READY" && (
+                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t border-slate-100 sm:border-t-0">
+                  <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                    {/* Tombol Periksa Lembar (Membuka VerifySheet) */}
                     <Button
-                      variant="secondary"
+                      variant="primary"
                       size="sm"
-                      onClick={() => handleQuickApprove(item)}
-                      className="h-9 px-3 gap-1.5 text-xs font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-                      title="Setujui lembar ini langsung ke rekap nilai"
+                      onClick={() => {
+                        if (!item.scanResult) {
+                          toast.info("Memproses citra lembar via OMR...");
+                          syncItem(item);
+                        } else {
+                          setReviewingItem(item);
+                        }
+                      }}
+                      className="h-8 sm:h-9 px-3 gap-1.5 text-xs font-bold flex-1 sm:flex-none justify-center"
                     >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Setujui</span>
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Periksa Lembar</span>
                     </Button>
-                  )}
 
-                  {/* Tombol Sync Ulang jika offline/failed */}
-                  {analysis.statusType === "OFFLINE" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={!isOnline || item.status === "UPLOADING"}
-                      onClick={() => syncItem(item)}
-                      className="h-9 px-2.5 text-xs text-slate-600 hover:text-brand-700"
-                      title="Coba proses ulang lembar ini"
-                    >
-                      <RotateCw
-                        className={cn(
-                          "w-3.5 h-3.5 mr-1",
-                          item.status === "UPLOADING" && "animate-spin"
-                        )}
-                      />
-                      Retry
-                    </Button>
-                  )}
+                    {/* Tombol Cepat Setujui jika status READY */}
+                    {analysis.statusType === "READY" && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleQuickApprove(item)}
+                        className="h-8 sm:h-9 px-3 gap-1.5 text-xs font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 shrink-0"
+                        title="Setujui lembar ini langsung ke rekap nilai"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Setujui</span>
+                      </Button>
+                    )}
+
+                    {/* Tombol Sync Ulang jika offline/failed */}
+                    {analysis.statusType === "OFFLINE" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!isOnline || item.status === "UPLOADING"}
+                        onClick={() => syncItem(item)}
+                        className="h-8 sm:h-9 px-2 text-xs text-slate-600 hover:text-brand-700 shrink-0"
+                        title="Coba proses ulang lembar ini"
+                      >
+                        <RotateCw
+                          className={cn(
+                            "w-3.5 h-3.5 mr-1",
+                            item.status === "UPLOADING" && "animate-spin"
+                          )}
+                        />
+                        Retry
+                      </Button>
+                    )}
+                  </div>
 
                   {/* Tombol Hapus */}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDeleteItem(item.id)}
-                    className="h-9 w-9 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 shrink-0"
                     title="Hapus dari antrean"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </Button>
                 </div>
               </div>
