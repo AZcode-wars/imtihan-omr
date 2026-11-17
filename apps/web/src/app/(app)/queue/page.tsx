@@ -601,7 +601,7 @@ export default function QueuePage() {
           <p className="text-sm font-medium">Memuat data kotak masuk koreksi...</p>
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-12 text-center flex flex-col items-center justify-center shadow-xs">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-12 text-center flex flex-col items-center justify-center shadow-xs">
           <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
             <CheckCircle2 className="w-9 h-9 stroke-[1.8]" />
           </div>

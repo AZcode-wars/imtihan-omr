@@ -249,7 +249,7 @@ export function VerifySheet({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center bg-slate-950/75 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden max-w-2xl w-full mx-auto animate-in slide-in-from-bottom duration-300">
+      <div className="bg-white rounded-none sm:rounded-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden max-w-2xl w-full mx-auto animate-in slide-in-from-bottom duration-300">
         {/* Header Sheet */}
         <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2">
