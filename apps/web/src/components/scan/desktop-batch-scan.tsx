@@ -1,9 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { ExamConfig, GradedStudentRecord, OMRScanResponse, Student } from "@/types/omr";
+import {
+  ExamConfig,
+  GradedStudentRecord,
+  OMREngineSettings,
+  OMRScanResponse,
+  Student,
+} from "@/types/omr";
 import { Button } from "@/components/ui/button";
-import { getActiveExam, saveGradeRecord } from "@/lib/db";
+import { getActiveExam, saveGradeRecord, getEngineSettings, DEFAULT_ENGINE_SETTINGS } from "@/lib/db";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -13,12 +19,14 @@ import {
   ChevronRight,
   FileCheck2,
   FileText,
+  Globe,
   Loader2,
   RotateCcw,
   Trash2,
   Upload,
   UserCheck,
   XCircle,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { calculateFinalGrade, formatFinalScore, type EssayMarkResult, type McQuestionResult } from "@/lib/scoring";
@@ -57,9 +65,12 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
   const [isProcessingAll, setIsProcessingAll] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"dropzone" | "workspace">("dropzone");
   const [examConfig, setExamConfig] = React.useState<ExamConfig | null>(null);
+  const [engineSettings, setEngineSettings] =
+    React.useState<OMREngineSettings>(DEFAULT_ENGINE_SETTINGS);
 
   React.useEffect(() => {
     async function loadConfig() {
+      setEngineSettings(getEngineSettings());
       const active = await getActiveExam();
       if (active) setExamConfig(active);
     }
@@ -348,6 +359,28 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Badge Engine OMR Aktif */}
+          <div
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-slate-50 text-slate-700 select-none"
+            title={
+              engineSettings.mode === "CLIENT_WASM"
+                ? "Engine: In-Browser WASM (OpenCV.js Web Worker)"
+                : `Engine: Server API (${engineSettings.serverUrl})`
+            }
+          >
+            {engineSettings.mode === "CLIENT_WASM" ? (
+              <>
+                <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <span className="text-slate-800">Engine: WASM (Offline)</span>
+              </>
+            ) : (
+              <>
+                <Globe className="w-3.5 h-3.5 text-sky-500" />
+                <span className="text-slate-800">Engine: Server API</span>
+              </>
+            )}
+          </div>
+
           <Button
             variant="ghost"
             size="sm"

@@ -4,7 +4,13 @@
  * data siswa lokal, dan hasil penilaian.
  */
 
-import { OfflineQueueItem, Student, ExamConfig, GradedStudentRecord } from "@/types/omr";
+import {
+  OfflineQueueItem,
+  Student,
+  ExamConfig,
+  GradedStudentRecord,
+  OMREngineSettings,
+} from "@/types/omr";
 
 export const DB_NAME = "imtihan_omr_db";
 export const DB_VERSION = 1;
@@ -326,4 +332,44 @@ export async function deleteStudent(studentId: string): Promise<void> {
     req.onerror = () => reject(req.error);
   });
 }
+
+/* ------------------------------------------------------------------ *
+ * Preferensi Mode Engine OMR (CLIENT_WASM vs SERVER_API)
+ * ------------------------------------------------------------------ */
+
+export const ENGINE_SETTINGS_KEY = "openomr_engine_settings";
+
+export const DEFAULT_ENGINE_SETTINGS: OMREngineSettings = {
+  mode: "CLIENT_WASM",
+  serverUrl: "http://localhost:8000",
+};
+
+export function getEngineSettings(): OMREngineSettings {
+  if (typeof window === "undefined") return DEFAULT_ENGINE_SETTINGS;
+  try {
+    const raw = localStorage.getItem(ENGINE_SETTINGS_KEY);
+    if (!raw) return DEFAULT_ENGINE_SETTINGS;
+    const parsed = JSON.parse(raw);
+    return {
+      mode: parsed.mode === "SERVER_API" ? "SERVER_API" : "CLIENT_WASM",
+      serverUrl:
+        typeof parsed.serverUrl === "string" && parsed.serverUrl.trim()
+          ? parsed.serverUrl.trim().replace(/\/+$/, "")
+          : "http://localhost:8000",
+      apiKey: typeof parsed.apiKey === "string" && parsed.apiKey.trim() ? parsed.apiKey.trim() : undefined,
+    };
+  } catch {
+    return DEFAULT_ENGINE_SETTINGS;
+  }
+}
+
+export function saveEngineSettings(settings: OMREngineSettings): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ENGINE_SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // ignore localStorage error
+  }
+}
+
 

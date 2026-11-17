@@ -7,10 +7,23 @@ import { ShutterButton } from "@/components/scan/shutter-button";
 import { VerifySheet } from "@/components/scan/verify-sheet";
 import { DesktopBatchScan } from "@/components/scan/desktop-batch-scan";
 import { Button } from "@/components/ui/button";
-import { addToQueue, getActiveExam, getAllStudents, saveGradeRecord } from "@/lib/db";
+import {
+  addToQueue,
+  getActiveExam,
+  getAllStudents,
+  saveGradeRecord,
+  getEngineSettings,
+  DEFAULT_ENGINE_SETTINGS,
+} from "@/lib/db";
 import { useSync } from "@/lib/sync-context";
 import { resizeImageFile } from "@/lib/image-utils";
-import { ExamConfig, GradedStudentRecord, OMRScanResponse, Student } from "@/types/omr";
+import {
+  ExamConfig,
+  GradedStudentRecord,
+  OMREngineSettings,
+  OMRScanResponse,
+  Student,
+} from "@/types/omr";
 import { buildTemplateFromExam } from "@/lib/template-builder";
 import { scanSheetWithClientEngine } from "@/lib/omr-engine/client";
 import { detectFiducialsFromImageData, type CornerFlags } from "@/lib/fiducial-detector";
@@ -26,11 +39,13 @@ import {
   CheckCircle2,
   FileCheck2,
   Flashlight,
+  Globe,
   Info,
   Loader2,
   RefreshCw,
   Upload,
   X,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,12 +70,17 @@ export default function ScanPage() {
     "IDLE" | "REQUESTING" | "ACTIVE" | "DENIED" | "UNAVAILABLE"
   >("IDLE");
 
+  // State Engine OMR Aktif
+  const [engineSettings, setEngineSettings] =
+    React.useState<OMREngineSettings>(DEFAULT_ENGINE_SETTINGS);
+
   // Load students dari IndexedDB
   const [students, setStudents] = React.useState<Student[]>([]);
 
   React.useEffect(() => {
     async function loadInitialData() {
       try {
+        setEngineSettings(getEngineSettings());
         const [active, storedStudents] = await Promise.all([
           getActiveExam(),
           getAllStudents(),
@@ -451,6 +471,28 @@ export default function ScanPage() {
                     {savedCount}/{totalStudents}
                   </strong>
                 </span>
+              </div>
+
+              {/* Indikator Mode Engine OMR Aktif */}
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white select-none"
+                title={
+                  engineSettings.mode === "CLIENT_WASM"
+                    ? "Engine: In-Browser WASM (OpenCV.js Web Worker)"
+                    : `Engine: Server API (${engineSettings.serverUrl})`
+                }
+              >
+                {engineSettings.mode === "CLIENT_WASM" ? (
+                  <>
+                    <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                    <span className="text-[11px] font-semibold text-amber-200">WASM</span>
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-3.5 h-3.5 text-sky-400" />
+                    <span className="text-[11px] font-semibold text-sky-200">Server</span>
+                  </>
+                )}
               </div>
             </div>
 

@@ -3,15 +3,40 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExamConfig, OptionLabel, QuestionStatus, RoundingRule, ScoringMode } from "@/types/omr";
+import {
+  ExamConfig,
+  OMREngineMode,
+  OMREngineSettings,
+  OptionLabel,
+  QuestionStatus,
+  RoundingRule,
+  ScoringMode,
+} from "@/types/omr";
 import { Stepper } from "@/components/ui/stepper";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Button } from "@/components/ui/button";
 import { AnswerKeyGrid, AnswerKeyItem } from "@/components/answer-key-grid";
 import { KeyEditorModal } from "@/components/key-editor-modal";
-import { getActiveExam, saveActiveExam } from "@/lib/db";
+import {
+  getActiveExam,
+  saveActiveExam,
+  getEngineSettings,
+  saveEngineSettings,
+  DEFAULT_ENGINE_SETTINGS,
+} from "@/lib/db";
+import { testServerConnection } from "@/lib/omr-engine/client";
 import { toast } from "sonner";
-import { FileText, Camera } from "lucide-react";
+import {
+  FileText,
+  Camera,
+  Cpu,
+  Zap,
+  Globe,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function SetupPage() {
   const router = useRouter();
@@ -42,10 +67,21 @@ export default function SetupPage() {
     }));
   });
 
+  // State Preferensi Engine OMR (Dual-Engine Mode)
+  const [engineSettings, setEngineSettings] =
+    React.useState<OMREngineSettings>(DEFAULT_ENGINE_SETTINGS);
+  const [isTestingConnection, setIsTestingConnection] = React.useState(false);
+  const [testStatus, setTestStatus] = React.useState<{ ok: boolean; message: string } | null>(
+    null
+  );
+
   // Muat konfigurasi tersimpan saat pertama kali halaman dibuka
   React.useEffect(() => {
     async function loadSavedConfig() {
       try {
+        const savedEngine = getEngineSettings();
+        setEngineSettings(savedEngine);
+
         const saved = await getActiveExam();
         if (saved) {
           setExamTitle(saved.title || "");
@@ -124,6 +160,54 @@ export default function SetupPage() {
     setWeightEssay(100 - val);
   };
 
+  const handleEngineModeChange = (mode: OMREngineMode) => {
+    const updated = { ...engineSettings, mode };
+    setEngineSettings(updated);
+    saveEngineSettings(updated);
+    setTestStatus(null);
+    toast.success(
+      mode === "CLIENT_WASM"
+        ? "Engine OMR beralih ke In-Browser WASM (Klien / Offline)"
+        : "Engine OMR beralih ke Server API (FastAPI / Eksternal)"
+    );
+  };
+
+  const handleServerUrlChange = (url: string) => {
+    const updated = { ...engineSettings, serverUrl: url };
+    setEngineSettings(updated);
+    saveEngineSettings(updated);
+    setTestStatus(null);
+  };
+
+  const handleApiKeyChange = (apiKey: string) => {
+    const updated = { ...engineSettings, apiKey: apiKey ? apiKey : undefined };
+    setEngineSettings(updated);
+    saveEngineSettings(updated);
+  };
+
+  const handleTestServer = async () => {
+    setIsTestingConnection(true);
+    setTestStatus(null);
+    try {
+      const res = await testServerConnection(engineSettings.serverUrl, engineSettings.apiKey);
+      if (res.ok) {
+        setTestStatus({
+          ok: true,
+          message: `Terhubung! Service: ${res.engine || "openomr-engine"} (v${res.version || "0.1.0"})`,
+        });
+        toast.success("Koneksi ke Server OMR Engine berhasil!");
+      } else {
+        setTestStatus({
+          ok: false,
+          message: res.error || "Gagal menghubungi server",
+        });
+        toast.error(`Koneksi server gagal: ${res.error}`);
+      }
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
   const handleSaveAndScan = async () => {
     if (pgCount > 30) {
       toast.error("Jumlah soal PG melebihi batas lembar A4 standar (maksimum 30 soal PG).");
@@ -161,7 +245,8 @@ export default function SetupPage() {
 
     try {
       await saveActiveExam(examConfig);
-      toast.success("Konfigurasi ujian berhasil disimpan ke sesi lokal!");
+      saveEngineSettings(engineSettings);
+      toast.success("Konfigurasi ujian & preferensi engine berhasil disimpan!");
       router.push("/scan");
     } catch (err) {
       console.error("Gagal menyimpan konfigurasi:", err);
@@ -403,7 +488,154 @@ export default function SetupPage() {
         </div>
       </section>
 
-      {/* 5. Bar CTA Bawah */}
+      {/* 5. Mode Engine Pemrosesan OMR (Dual-Engine: WASM vs Server API) */}
+      <section className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-brand-700" />
+            <span className="text-[11px] font-bold tracking-wider text-brand-700 uppercase">
+              Mode Engine Pemrosesan OMR
+            </span>
+          </div>
+          <span className="text-[11px] font-bold text-slate-400">DUAL-ENGINE ARCHITECTURE</span>
+        </div>
+
+        <p className="text-xs text-slate-500 leading-relaxed">
+          Pilih engine yang digunakan untuk memproses citra lembar jawaban (LJK). Keduanya menghasilkan format data yang identik.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Card 1: In-Browser WASM */}
+          <div
+            onClick={() => handleEngineModeChange("CLIENT_WASM")}
+            className={cn(
+              "relative p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between gap-3 text-left",
+              engineSettings.mode === "CLIENT_WASM"
+                ? "border-brand-600 bg-brand-50/40 ring-1 ring-brand-600/30"
+                : "border-slate-200 hover:border-slate-300 bg-white"
+            )}
+          >
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-sm text-slate-800">
+                  <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+                  <span>In-Browser WASM</span>
+                </div>
+                {engineSettings.mode === "CLIENT_WASM" && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-brand-600 ring-4 ring-brand-100" />
+                )}
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                OpenCV.js WebAssembly di Web Worker. Berjalan 100% di browser klien (HP/laptop), tanpa server, dan bekerja secara offline.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md w-fit">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Rekomendasi • Tanpa Setup Server</span>
+            </div>
+          </div>
+
+          {/* Card 2: Server API */}
+          <div
+            onClick={() => handleEngineModeChange("SERVER_API")}
+            className={cn(
+              "relative p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between gap-3 text-left",
+              engineSettings.mode === "SERVER_API"
+                ? "border-brand-600 bg-brand-50/40 ring-1 ring-brand-600/30"
+                : "border-slate-200 hover:border-slate-300 bg-white"
+            )}
+          >
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-sm text-slate-800">
+                  <Globe className="w-4 h-4 text-sky-500" />
+                  <span>Server API (FastAPI)</span>
+                </div>
+                {engineSettings.mode === "SERVER_API" && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-brand-600 ring-4 ring-brand-100" />
+                )}
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Mendelegasikan ke service backend Python (port 8000), integrasi Kelaskita LMS, atau deployment cloud mitra.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md w-fit">
+              <span>Endpoint REST /v1/scan/json</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Konfigurasi Server jika SERVER_API aktif */}
+        {engineSettings.mode === "SERVER_API" && (
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-3 animate-in fade-in duration-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">
+                  URL Server OMR Engine
+                </label>
+                <input
+                  type="text"
+                  value={engineSettings.serverUrl}
+                  onChange={(e) => handleServerUrlChange(e.target.value)}
+                  placeholder="http://localhost:8000"
+                  className="w-full h-10 px-3 text-xs rounded-lg border border-slate-200 bg-white font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">
+                  API Key (Opsional)
+                </label>
+                <input
+                  type="password"
+                  value={engineSettings.apiKey || ""}
+                  onChange={(e) => handleApiKeyChange(e.target.value)}
+                  placeholder="Disertakan via header X-API-Key"
+                  className="w-full h-10 px-3 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/60">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleTestServer}
+                disabled={isTestingConnection}
+                className="text-xs h-8 gap-1.5"
+              >
+                {isTestingConnection ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Globe className="w-3.5 h-3.5 text-brand-700" />
+                )}
+                <span>{isTestingConnection ? "Menghubungi Server..." : "Tes Koneksi Server"}</span>
+              </Button>
+
+              {testStatus && (
+                <span
+                  className={cn(
+                    "text-xs flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium",
+                    testStatus.ok
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                  )}
+                >
+                  {testStatus.ok ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                  )}
+                  <span>{testStatus.message}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* 6. Bar CTA Bawah */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 sticky bottom-20 lg:bottom-4 z-10">
         <div className="text-xs text-slate-600">
           Total Ujian: <strong className="text-slate-800">{pgCount} PG</strong>
