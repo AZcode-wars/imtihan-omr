@@ -7,6 +7,7 @@ import {
   calculateBubbleFillRatio,
   warpToStandardCanvas,
   findFiducialMarkers,
+  cropRectMm,
   PAGE_WIDTH_MM,
   PAGE_HEIGHT_MM,
 } from "./core";
@@ -125,6 +126,23 @@ describe("In-Browser OMR Core - OpenCV.js Integration", () => {
     expect(warped.rows).toBe(1188);
 
     srcImg.delete();
+    warped.delete();
+  });
+
+  it("harus dapat melakukan cropRectMm dengan format { x, y, w, h } standar schema", () => {
+    expect(cv).toBeDefined();
+
+    const warped = new cv.Mat.zeros(1188, 840, cv.CV_8UC1);
+    // Format RectMm dari @openomr/schemas
+    const nameRect = { x: 14, y: 30, w: 90, h: 20 };
+    const cropped = cropRectMm(cv, warped, nameRect, 840, 1188);
+
+    expect(cropped.cols).toBeGreaterThan(0);
+    expect(cropped.rows).toBeGreaterThan(0);
+    expect(Number.isNaN(cropped.cols)).toBe(false);
+    expect(Number.isNaN(cropped.rows)).toBe(false);
+
+    cropped.delete();
     warped.delete();
   });
 });

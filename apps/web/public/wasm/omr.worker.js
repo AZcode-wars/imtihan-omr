@@ -60,6 +60,13 @@ const FILLED_THRESHOLD = 0.45;
 
 // 3. Encoder Citra Mat ke Base64 Data URL via OffscreenCanvas
 async function encodeMatToDataUrl(cvInst, mat, quality = 0.85) {
+  if (!mat || typeof mat.cols !== "number" || typeof mat.rows !== "number") {
+    return "";
+  }
+
+  const cols = Math.max(1, Math.floor(mat.cols || 1));
+  const rows = Math.max(1, Math.floor(mat.rows || 1));
+
   let rgba = mat;
   let tempMat = null;
 
@@ -73,13 +80,10 @@ async function encodeMatToDataUrl(cvInst, mat, quality = 0.85) {
     rgba = tempMat;
   }
 
-  const canvas = new OffscreenCanvas(rgba.cols, rgba.rows);
+  const canvas = new OffscreenCanvas(cols, rows);
   const ctx = canvas.getContext("2d");
-  const imgData = new ImageData(
-    new Uint8ClampedArray(rgba.data),
-    rgba.cols,
-    rgba.rows
-  );
+  const imgData = ctx.createImageData(cols, rows);
+  imgData.data.set(new Uint8ClampedArray(rgba.data));
   ctx.putImageData(imgData, 0, 0);
 
   if (tempMat) tempMat.delete();
@@ -369,13 +373,28 @@ function classifySlot(optionFillRatios, qNum) {
 }
 
 function cropMm(cvInst, warpedMat, rectMm, targetW = 840, targetH = 1188) {
+  if (!rectMm || !warpedMat || warpedMat.cols <= 0 || warpedMat.rows <= 0) return null;
+
   const pxX = targetW / PAGE_WIDTH_MM;
   const pxY = targetH / PAGE_HEIGHT_MM;
 
-  const x1 = Math.max(0, Math.min(warpedMat.cols - 1, Math.round(rectMm.xMm * pxX)));
-  const y1 = Math.max(0, Math.min(warpedMat.rows - 1, Math.round(rectMm.yMm * pxY)));
-  const w = Math.max(1, Math.min(warpedMat.cols - x1, Math.round(rectMm.widthMm * pxX)));
-  const h = Math.max(1, Math.min(warpedMat.rows - y1, Math.round(rectMm.heightMm * pxY)));
+  const rawX = rectMm.x !== undefined ? rectMm.x : rectMm.xMm !== undefined ? rectMm.xMm : 0;
+  const rawY = rectMm.y !== undefined ? rectMm.y : rectMm.yMm !== undefined ? rectMm.yMm : 0;
+  const rawW = rectMm.w !== undefined ? rectMm.w : rectMm.widthMm !== undefined ? rectMm.widthMm : 20;
+  const rawH = rectMm.h !== undefined ? rectMm.h : rectMm.heightMm !== undefined ? rectMm.heightMm : 10;
+
+  const numX = Number(rawX) || 0;
+  const numY = Number(rawY) || 0;
+  const numW = Number(rawW) || 20;
+  const numH = Number(rawH) || 10;
+
+  const maxW = warpedMat.cols;
+  const maxH = warpedMat.rows;
+
+  const x1 = Math.max(0, Math.min(maxW - 1, Math.round(numX * pxX)));
+  const y1 = Math.max(0, Math.min(maxH - 1, Math.round(numY * pxY)));
+  const w = Math.max(1, Math.min(maxW - x1, Math.round(numW * pxX)));
+  const h = Math.max(1, Math.min(maxH - y1, Math.round(numH * pxY)));
 
   const rect = new cvInst.Rect(x1, y1, w, h);
   const cropped = warpedMat.roi(rect);
@@ -416,6 +435,10 @@ self.onmessage = async (e) => {
     const resp = await fetch(imageDataUrl);
     const blob = await resp.blob();
     const bitmap = await createImageBitmap(blob);
+
+    if (!bitmap.width || !bitmap.height || bitmap.width <= 0 || bitmap.height <= 0) {
+      throw new Error("Resolusi citra kamera tidak valid (lebar atau tinggi 0).");
+    }
 
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
     const ctx = canvas.getContext("2d");
@@ -480,15 +503,22 @@ self.onmessage = async (e) => {
     binary.delete();
 
     // Crop nama & esai
-    const nameCropMat = cropMm(cvInst, warped, template.nameCropRectMm, targetW, targetH);
-    const studentNameCropUrl = await encodeMatToDataUrl(cvInst, nameCropMat, 0.9);
-    nameCropMat.delete();
+    let studentNameCropUrl = "";
+    if (template.nameCropRectMm) {
+      const nameCropMat = cropMm(cvInst, warped, template.nameCropRectMm, targetW, targetH);
+      if (nameCropMat) {
+        studentNameCropUrl = await encodeMatToDataUrl(cvInst, nameCropMat, 0.9);
+        nameCropMat.delete();
+      }
+    }
 
     let essayAreaCropUrl = undefined;
     if (template.essayAreaRectMm) {
       const essayMat = cropMm(cvInst, warped, template.essayAreaRectMm, targetW, targetH);
-      essayAreaCropUrl = await encodeMatToDataUrl(cvInst, essayMat, 0.85);
-      essayMat.delete();
+      if (essayMat) {
+        essayAreaCropUrl = await encodeMatToDataUrl(cvInst, essayMat, 0.85);
+        essayMat.delete();
+      }
     }
 
     const fullWarpedImageUrl = await encodeMatToDataUrl(cvInst, warped, 0.8);
