@@ -52,8 +52,12 @@ export function SidebarNav({ queueCount = 0, className }: SidebarNavProps) {
       <div className="p-4">
         {/* Brand Logo & Header */}
         <div className="flex items-center gap-3 px-2 py-3 mb-6 border-b border-slate-100">
-          <div className="w-8 h-8 rounded-lg bg-brand-700 flex items-center justify-center text-white shadow-xs">
-            <ScanLine className="w-4 h-4" />
+          <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
+            <img
+              src="/imtihan-logo.svg"
+              alt="Logo ImtihanOMR"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
             <div className="flex items-center gap-1.5">

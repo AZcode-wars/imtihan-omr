@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { ScanLine, Wifi, WifiOff } from "lucide-react";
+import { Wifi, WifiOff } from "lucide-react";
 
 export interface AppHeaderProps {
   examTitle?: string;
@@ -25,8 +25,12 @@ export function AppHeader({
       )}
     >
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-brand-700 border border-brand-500/40 flex items-center justify-center text-brand-200 shadow-xs">
-          <ScanLine className="w-4 h-4" />
+        <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 shadow-xs flex items-center justify-center bg-white/10 p-0.5">
+          <img
+            src="/imtihan-logo.svg"
+            alt="Logo ImtihanOMR"
+            className="w-full h-full object-contain"
+          />
         </div>
         <div>
           <div className="flex items-center gap-2">

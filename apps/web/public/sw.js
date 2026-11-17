@@ -1,7 +1,11 @@
-const CACHE_NAME = "imtihan-omr-shell-v1";
+const CACHE_NAME = "imtihan-omr-shell-v2";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
+  "/imtihan-logo.svg",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
   "/setup",
   "/students",
   "/template",
