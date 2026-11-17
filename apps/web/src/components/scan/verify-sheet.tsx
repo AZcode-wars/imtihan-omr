@@ -26,6 +26,7 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
+  Clock,
   User,
   X,
   XCircle,
@@ -37,6 +38,14 @@ export interface VerifySheetProps {
   students: Student[];
   onClose: () => void;
   onSave: (record: any) => void;
+  onSaveToQueue?: (data: {
+    scanResult: OMRScanResponse;
+    selectedStudentId?: string;
+    selectedStudentName?: string;
+    essayMarks?: EssayMark[];
+  }) => void;
+  initialStudentId?: string;
+  initialEssayMarks?: EssayMark[];
 }
 
 const BUBBLE_OPTIONS: (OptionLabel | "EMPTY")[] = ["A", "B", "C", "D", "EMPTY"];
@@ -46,10 +55,13 @@ export function VerifySheet({
   students,
   onClose,
   onSave,
+  onSaveToQueue,
+  initialStudentId,
+  initialEssayMarks,
 }: VerifySheetProps) {
   // State Siswa Terpilih
   const [selectedStudentId, setSelectedStudentId] = React.useState<string>(
-    students[0]?.id || ""
+    initialStudentId || students[0]?.id || ""
   );
   const [examConfig, setExamConfig] = React.useState<ExamConfig | null>(null);
 
@@ -82,6 +94,9 @@ export function VerifySheet({
   // Default: Belum dinilai (0 poin / INCORRECT) agar nilai tidak terinflasi sebelum diperiksa guru
   const essayCount = examConfig?.essayQuestions?.length ?? 0;
   const [essayMarks, setEssayMarks] = React.useState<EssayMark[]>(() => {
+    if (initialEssayMarks && initialEssayMarks.length > 0) {
+      return initialEssayMarks;
+    }
     return Array.from({ length: essayCount }, (_, i) => ({
       questionNumber: i + 1,
       maxScore: examConfig?.essayQuestions[i]?.maxScore || 5,
@@ -91,7 +106,9 @@ export function VerifySheet({
   });
 
   React.useEffect(() => {
-    if (examConfig?.essayQuestions) {
+    if (initialEssayMarks && initialEssayMarks.length > 0) {
+      setEssayMarks(initialEssayMarks);
+    } else if (examConfig?.essayQuestions) {
       setEssayMarks(
         examConfig.essayQuestions.map((eq) => ({
           questionNumber: eq.number,
@@ -101,7 +118,7 @@ export function VerifySheet({
         }))
       );
     }
-  }, [examConfig]);
+  }, [examConfig, initialEssayMarks]);
 
   // Nomor-nomor bermasalah (Exception First)
   const problemAnswers = mcAnswers.filter((a) => a.status !== "VALID");
@@ -211,6 +228,23 @@ export function VerifySheet({
 
     onSave(record);
     toast.success(`Nilai ${selectedStudent.name} (${formattedScore}) berhasil disimpan!`);
+  };
+
+  const handleSaveToQueue = () => {
+    if (onSaveToQueue) {
+      onSaveToQueue({
+        scanResult: {
+          ...scanResult,
+          mcAnswers,
+        },
+        selectedStudentId: selectedStudent?.id,
+        selectedStudentName: selectedStudent?.name,
+        essayMarks,
+      });
+      toast.success(
+        `Lembar ${selectedStudent ? selectedStudent.name : "siswa"} disimpan ke Antrean Review.`
+      );
+    }
   };
 
   return (
@@ -479,16 +513,32 @@ export function VerifySheet({
           </section>
         </div>
 
-        {/* Footer Sheet Sticky */}
-        <div className="p-4 border-t border-slate-100 bg-white shrink-0">
+        {/* Footer Sheet Sticky - Dual Action */}
+        <div className="p-4 border-t border-slate-100 bg-white shrink-0 flex flex-col sm:flex-row items-center gap-2.5">
+          {onSaveToQueue && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              onClick={handleSaveToQueue}
+              className="w-full sm:w-1/2 gap-2 text-sm font-bold border-brand-200 text-brand-800 hover:bg-brand-50"
+            >
+              <Clock className="w-4 h-4 text-brand-600" />
+              <span>Simpan ke Antrean & Lanjut</span>
+            </Button>
+          )}
           <Button
+            type="button"
             variant="primary"
             size="lg"
             onClick={handleSaveRecord}
-            className="w-full gap-2 text-base font-bold"
+            className={cn(
+              "w-full gap-2 text-sm sm:text-base font-bold",
+              onSaveToQueue ? "sm:w-1/2" : "w-full"
+            )}
           >
-            <span>Simpan Nilai & Scan Berikutnya</span>
-            <ArrowRight className="w-5 h-5 text-white" />
+            <span>Simpan Nilai & Rekap</span>
+            <ArrowRight className="w-4 h-4 text-white" />
           </Button>
         </div>
       </div>

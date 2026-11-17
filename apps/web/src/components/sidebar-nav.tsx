@@ -26,7 +26,7 @@ const menuItems = [
   { href: "/students", label: "Kelas & Siswa", icon: Users },
   { href: "/template", label: "Blueprint LJK", icon: FileText },
   { href: "/scan", label: "Scan LJK", icon: ScanLine },
-  { href: "/queue", label: "Antrean Offline", icon: CloudUpload, hasBadge: true },
+  { href: "/queue", label: "Kotak Masuk Koreksi", icon: CloudUpload, hasBadge: true },
   { href: "/grades", label: "Rekap Nilai", icon: ClipboardList },
 ];
 

@@ -76,6 +76,10 @@ export async function addToQueue(
     createdAt?: string;
     attempts?: number;
     status?: OfflineQueueItem["status"];
+    scanResult?: OfflineQueueItem["scanResult"];
+    selectedStudentId?: string;
+    selectedStudentName?: string;
+    essayMarks?: OfflineQueueItem["essayMarks"];
   }
 ): Promise<OfflineQueueItem> {
   const db = await getDB();
@@ -88,6 +92,10 @@ export async function addToQueue(
     status: item.status || "PENDING",
     attempts: item.attempts ?? 0,
     lastError: item.lastError,
+    scanResult: item.scanResult,
+    selectedStudentId: item.selectedStudentId,
+    selectedStudentName: item.selectedStudentName,
+    essayMarks: item.essayMarks,
   };
 
   return new Promise((resolve, reject) => {

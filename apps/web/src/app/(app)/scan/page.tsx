@@ -640,6 +640,37 @@ export default function ScanPage() {
                 setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
               }}
               onSave={handleSaveVerify}
+              onSaveToQueue={async (payload) => {
+                try {
+                  await addToQueue({
+                    examId: examConfig?.id || "active_exam_config",
+                    thumbnailDataUrl:
+                      payload.scanResult.studentNameCropUrl ||
+                      payload.scanResult.fullWarpedImageUrl ||
+                      "",
+                    imageDataUrl: payload.scanResult.fullWarpedImageUrl || "",
+                    status: "PENDING_REVIEW",
+                    scanResult: payload.scanResult,
+                    selectedStudentId: payload.selectedStudentId,
+                    selectedStudentName: payload.selectedStudentName,
+                    essayMarks: payload.essayMarks,
+                  });
+                  await refreshQueueCount();
+                } catch (err) {
+                  console.error("Gagal menyimpan ke antrean:", err);
+                  toast.error("Gagal menyimpan ke antrean lokal.");
+                }
+
+                if (pendingMobileFiles.length > 0 && currentFileIndex < pendingMobileFiles.length - 1) {
+                  const nextIdx = currentFileIndex + 1;
+                  setCurrentFileIndex(nextIdx);
+                  handleCapture(pendingMobileFiles[nextIdx]);
+                } else {
+                  setPendingMobileFiles([]);
+                  setScanResult(null);
+                  setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
+                }
+              }}
             />
           )}
         </div>

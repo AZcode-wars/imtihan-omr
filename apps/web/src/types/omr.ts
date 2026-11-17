@@ -22,8 +22,6 @@ export type {
   MultipleChoiceQuestionConfig,
   MultipleChoiceSlot,
   OMRScanResponse,
-  OfflineQueueItem,
-  OfflineQueueStatus,
   OptionLabel,
   PointMm,
   QuestionStatus,
@@ -32,3 +30,28 @@ export type {
   ScoringMode,
   Student,
 } from "@openomr/schemas";
+
+import type {
+  OfflineQueueItem as BaseOfflineQueueItem,
+  OfflineQueueStatus as BaseOfflineQueueStatus,
+  OMRScanResponse,
+  EssayMark,
+} from "@openomr/schemas";
+
+/**
+ * Status item di antrean lokal (IndexedDB)
+ * Diperluas dengan PENDING_REVIEW untuk lembar yang sudah di-scan tapi ditunda reviewnya.
+ */
+export type OfflineQueueStatus = BaseOfflineQueueStatus | "PENDING_REVIEW";
+
+/**
+ * OfflineQueueItem diperkaya dengan scanResult opsional
+ * agar hasil pembacaan OMR instan dapat disimpan ke antrean review.
+ */
+export interface OfflineQueueItem extends Omit<BaseOfflineQueueItem, "status"> {
+  status: OfflineQueueStatus;
+  scanResult?: OMRScanResponse;
+  selectedStudentId?: string;
+  selectedStudentName?: string;
+  essayMarks?: EssayMark[];
+}
