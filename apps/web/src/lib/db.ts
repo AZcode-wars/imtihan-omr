@@ -282,6 +282,21 @@ export async function getAllGradeRecords(): Promise<GradedStudentRecord[]> {
   });
 }
 
+export async function getGradeRecordsByExam(examId: string): Promise<GradedStudentRecord[]> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.GRADES, "readonly");
+    const store = tx.objectStore(STORES.GRADES);
+    const index = store.index("by_examId");
+    const req = index.getAll(examId);
+    req.onsuccess = () => {
+      const docs = (req.result || []) as (GradedStudentRecord & { id?: string })[];
+      resolve(docs.map(({ id: _id, ...rest }) => rest as GradedStudentRecord));
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function deleteGradeRecord(recordId: string): Promise<void> {
   const db = await getDB();
   return new Promise((resolve, reject) => {

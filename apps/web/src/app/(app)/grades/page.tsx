@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FilterChips, GradeFilter } from "@/components/grades/filter-chips";
 import { StudentGradeCard, StudentGradeRecord } from "@/components/grades/student-grade-card";
 import { GradeTableDesktop } from "@/components/grades/grade-table-desktop";
-import { getAllGradeRecords, getAllStudents, getActiveExam } from "@/lib/db";
+import { getAllGradeRecords, getGradeRecordsByExam, getAllStudents, getActiveExam } from "@/lib/db";
 import { ExamConfig, GradedStudentRecord } from "@/types/omr";
 import { toast } from "sonner";
 import { Download, Search, Users } from "lucide-react";
@@ -24,10 +24,12 @@ export default function GradesPage() {
   React.useEffect(() => {
     async function loadData() {
       try {
-        const [gradeRecords, students, config] = await Promise.all([
-          getAllGradeRecords(),
+        const config = await getActiveExam();
+        const activeExamId = config?.id || "active_exam_config";
+
+        const [gradeRecords, students] = await Promise.all([
+          getGradeRecordsByExam(activeExamId),
           getAllStudents(),
-          getActiveExam(),
         ]);
 
         setTotalStudentsInClass(students.length);
@@ -39,11 +41,26 @@ export default function GradesPage() {
           setExamLabel(`${examTitle} ${className}`);
         }
 
+        // Urutkan berdasarkan waktu pindaian terbaru
+        const sortedRecords = [...gradeRecords].sort(
+          (a, b) => new Date(b.verifiedAt).getTime() - new Date(a.verifiedAt).getTime()
+        );
+
+        // Deduplikasi per studentId (ambil attempt terbaru)
+        const latestPerStudent = new Map<string, GradedStudentRecord>();
+        for (const gr of sortedRecords) {
+          if (!latestPerStudent.has(gr.studentId)) {
+            latestPerStudent.set(gr.studentId, gr);
+          }
+        }
+        const uniqueGradeRecords = Array.from(latestPerStudent.values());
+
         // Map GradedStudentRecord ke StudentGradeRecord untuk tampilan
-        const mapped: StudentGradeRecord[] = gradeRecords.map((gr) => {
+        const mapped: StudentGradeRecord[] = uniqueGradeRecords.map((gr) => {
           const isPassing = gr.finalGrade >= (config?.passingScore ?? 75);
           return {
             id: gr.recordId,
+            studentId: gr.studentId,
             nis: "", // akan di-enrich dari students
             name: gr.studentName,
             mcPoints: gr.rawMCScore,
@@ -59,7 +76,7 @@ export default function GradesPage() {
         // Enrich NIS dari student data
         const studentMap = new Map(students.map((s) => [s.id, s]));
         for (const rec of mapped) {
-          const gr = gradeRecords.find((g) => g.recordId === rec.id);
+          const gr = uniqueGradeRecords.find((g) => g.recordId === rec.id);
           if (gr) {
             const student = studentMap.get(gr.studentId);
             if (student) {
@@ -120,12 +137,14 @@ export default function GradesPage() {
       else remedial++;
     }
 
+    const scannedUnique = Math.min(records.length, totalStudentsInClass);
+
     return {
       avg: avgVal.toLocaleString("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
       highest: maxRecord.finalGrade.toLocaleString("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
       highestName: maxRecord.name,
-      scannedCount: records.length,
-      remainingCount: Math.max(0, totalStudentsInClass - records.length),
+      scannedCount: scannedUnique,
+      remainingCount: Math.max(0, totalStudentsInClass - scannedUnique),
       passCount: pass,
       remedialCount: remedial,
     };
@@ -200,8 +219,12 @@ export default function GradesPage() {
       {/* Toolbar Pencarian & Filter Status */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="relative w-full md:w-80">
+          <label htmlFor="search-grades" className="sr-only">
+            Cari nama atau NIS siswa
+          </label>
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
+            id="search-grades"
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}

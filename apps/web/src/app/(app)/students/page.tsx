@@ -208,8 +208,12 @@ export default function StudentsPage() {
         </div>
 
         <div className="relative w-full sm:w-72">
+          <label htmlFor="search-students" className="sr-only">
+            Cari siswa berdasarkan nama atau NIS
+          </label>
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
+            id="search-students"
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -263,7 +267,8 @@ export default function StudentsPage() {
                     type="button"
                     onClick={() => handleDeleteStudent(student.id, student.name)}
                     className="p-1.5 text-slate-300 hover:text-rose-600 transition-colors cursor-pointer rounded-lg hover:bg-rose-50"
-                    title="Hapus siswa"
+                    title={`Hapus siswa ${student.name}`}
+                    aria-label={`Hapus ${student.name}`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

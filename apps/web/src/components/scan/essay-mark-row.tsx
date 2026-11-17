@@ -94,13 +94,15 @@ export function EssayMarkRow({
         </button>
 
         <div className="flex items-center gap-1 pl-1">
-          <span className="text-[11px] text-slate-400">Nilai:</span>
+          <label htmlFor={`essay-score-input-${questionNumber}`} className="text-[11px] text-slate-400">Nilai:</label>
           <input
+            id={`essay-score-input-${questionNumber}`}
             type="number"
             min={0}
             max={maxScore}
             step={0.5}
             value={pointsAwarded}
+            aria-label={`Nilai esai E${questionNumber}`}
             onChange={handlePointsChange}
             className="w-14 h-8 px-1.5 text-center text-xs font-bold border-2 border-brand-700/60 rounded-md bg-white text-brand-900 tabular-nums focus:border-brand-700 focus:outline-none"
           />

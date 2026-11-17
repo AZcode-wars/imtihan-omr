@@ -227,6 +227,7 @@ export function VerifySheet({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Tutup verifikasi"
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -269,10 +270,12 @@ export function VerifySheet({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">
+              <label htmlFor="verify-student-select" className="text-xs font-bold text-slate-700">
                 Cocokkan Siswa di Daftar Kelas:
               </label>
               <select
+                id="verify-student-select"
+                aria-label="Pilih siswa pemilik lembar"
                 value={selectedStudentId}
                 onChange={(e) => setSelectedStudentId(e.target.value)}
                 className="w-full h-11 px-3 rounded-xl border-2 border-brand-700/40 bg-white font-bold text-slate-800 text-sm focus:outline-none focus:border-brand-700"

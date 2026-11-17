@@ -58,17 +58,24 @@ export default function SetupPage() {
             setWeightEssay(saved.sectionWeights.essayPercent ?? 40);
           }
           if (saved.multipleChoiceQuestions?.length > 0) {
-            setPgCount(saved.multipleChoiceQuestions.length);
+            const count = Math.min(30, saved.multipleChoiceQuestions.length);
+            setPgCount(count);
             setAnswers(
-              saved.multipleChoiceQuestions.map((q) => ({
+              saved.multipleChoiceQuestions.slice(0, count).map((q) => ({
                 questionNumber: q.number,
                 key: q.correctAnswer,
                 status: q.status,
               }))
             );
+            if (saved.multipleChoiceQuestions[0]?.pointsCorrect !== undefined) {
+              setPointsPerPg(saved.multipleChoiceQuestions[0].pointsCorrect);
+            }
           }
-          if (saved.essayQuestions) {
+          if (saved.essayQuestions && saved.essayQuestions.length > 0) {
             setEssayCount(saved.essayQuestions.length);
+            if (saved.essayQuestions[0]?.maxScore !== undefined) {
+              setMaxScorePerEssay(saved.essayQuestions[0].maxScore);
+            }
           }
         }
       } catch (err) {
@@ -118,6 +125,15 @@ export default function SetupPage() {
   };
 
   const handleSaveAndScan = async () => {
+    if (pgCount > 30) {
+      toast.error("Jumlah soal PG melebihi batas lembar A4 standar (maksimum 30 soal PG).");
+      return;
+    }
+    if (pgCount <= 0) {
+      toast.error("Jumlah soal PG minimal 1 soal.");
+      return;
+    }
+
     const examConfig: ExamConfig = {
       id: "active_exam_config",
       title: examTitle,
@@ -153,11 +169,12 @@ export default function SetupPage() {
     }
   };
 
-  // Kalkulasi total poin maksimal
+  // Kalkulasi total poin maksimal (kecualikan soal status VOID)
+  const activePgQuestionsCount = answers.filter((a) => a.status !== "VOID").length;
   const totalMaxPoints =
     scoringMode === "MODE_A_PERCENTAGE"
       ? 100
-      : pgCount * pointsPerPg + essayCount * maxScorePerEssay;
+      : activePgQuestionsCount * pointsPerPg + essayCount * maxScorePerEssay;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
@@ -248,10 +265,10 @@ export default function SetupPage() {
             label="Pilihan Ganda (A–D)"
             value={pgCount}
             min={1}
-            max={63}
+            max={30}
             step={1}
-            helper="Kapasitas A4: maks 63 soal (tanpa esai) / 45 soal (dengan esai)"
-            onChange={setPgCount}
+            helper="Kapasitas Lembar A4 Standar: maksimum 30 soal PG"
+            onChange={(val) => setPgCount(Math.min(30, Math.max(1, val)))}
           />
           <Stepper
             label="Soal Esai (Zona Tunggal)"

@@ -23,6 +23,14 @@ import {
 import { cn } from "@/lib/utils";
 import { calculateFinalGrade, formatFinalScore, type EssayMarkResult, type McQuestionResult } from "@/lib/scoring";
 import { buildTemplateFromExam } from "@/lib/template-builder";
+import { EssayMarkRow } from "@/components/scan/essay-mark-row";
+
+export interface BatchEssayMark {
+  questionNumber: number;
+  maxScore: number;
+  outcome: "CORRECT" | "INCORRECT" | "PARTIAL";
+  pointsAwarded: number;
+}
 
 export interface BatchItem {
   id: string;
@@ -34,6 +42,7 @@ export interface BatchItem {
   warningCount: number;
   previewUrl?: string;
   file?: File;
+  essayMarks?: BatchEssayMark[];
 }
 
 export interface DesktopBatchScanProps {
@@ -238,8 +247,8 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
   }, [activeTab, items.length]);
 
   // Perhitungan Nilai Live Lembar Aktif (Cocokkan dengan Kunci Jawaban Ujian Aktif & Aturan Scoring)
-  const calculateScore = (scan?: OMRScanResponse) => {
-    const mcConfig = examConfig?.multipleChoiceQuestions || [];
+  const calculateScore = (scan?: OMRScanResponse, customEssayMarks?: BatchEssayMark[]) => {
+    const mcConfig = (examConfig?.multipleChoiceQuestions || []).slice(0, 30);
     const essayConfig = examConfig?.essayQuestions || [];
 
     const mcQuestions: McQuestionResult[] = mcConfig.map((q) => {
@@ -255,11 +264,22 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
       };
     });
 
-    const essayQuestions: EssayMarkResult[] = essayConfig.map((eq) => ({
-      number: eq.number,
-      maxScore: eq.maxScore ?? 10,
-      outcome: "INCORRECT",
-    }));
+    const essayQuestions: EssayMarkResult[] = essayConfig.map((eq) => {
+      const mark = customEssayMarks?.find((m) => m.questionNumber === eq.number);
+      if (mark) {
+        return {
+          number: eq.number,
+          maxScore: eq.maxScore ?? 10,
+          outcome: mark.outcome,
+          partialScore: mark.pointsAwarded,
+        };
+      }
+      return {
+        number: eq.number,
+        maxScore: eq.maxScore ?? 10,
+        outcome: "INCORRECT",
+      };
+    });
 
     const scoringRes = calculateFinalGrade({
       mode: examConfig?.scoringMode ?? "MODE_A_PERCENTAGE",
@@ -684,7 +704,7 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                       <>
                         {/* Ringkasan Skor Live */}
                         {(() => {
-                          const scoreInfo = calculateScore(selectedItem.scanResult);
+                          const scoreInfo = calculateScore(selectedItem.scanResult, selectedItem.essayMarks);
                           const isModeB = examConfig?.scoringMode === "MODE_B_DIRECT_POINTS";
                           return (
                             <div className="p-4 rounded-xl bg-gradient-to-br from-brand-50 to-emerald-50/40 border border-brand-200">
@@ -695,7 +715,8 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                                   </span>
                                   <span className="text-[11px] text-brand-700 font-medium">
                                     {scoreInfo.correctCount} Benar dari {scoreInfo.totalCount} Soal PG
-                                    {isModeB && ` · ${scoreInfo.scoringRes.mcPoints} / ${scoreInfo.scoringRes.mcMaxPoints} Poin`}
+                                    {isModeB && ` · PG: ${scoreInfo.scoringRes.mcPoints}/${scoreInfo.scoringRes.mcMaxPoints} Poin`}
+                                    {scoreInfo.scoringRes.essayMaxPoints > 0 && ` · Esai: ${scoreInfo.scoringRes.essayPoints}/${scoreInfo.scoringRes.essayMaxPoints} Poin`}
                                   </span>
                                 </div>
                                 <div className="text-right">
@@ -767,7 +788,7 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                             <div className="p-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs flex items-center gap-2">
                               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                               <span>
-                                Semua {calculateScore(selectedItem.scanResult).totalCount} nomor terbaca mantap tanpa keraguan.
+                                Semua {calculateScore(selectedItem.scanResult, selectedItem.essayMarks).totalCount} nomor terbaca mantap tanpa keraguan.
                               </span>
                             </div>
                           ) : (
@@ -806,6 +827,61 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                             </div>
                           )}
                         </div>
+
+                        {/* Penilaian Esai Guru */}
+                        {examConfig?.essayQuestions && examConfig.essayQuestions.length > 0 && (
+                          <div className="space-y-3 pt-3 border-t border-slate-100">
+                            <span className="text-xs font-bold text-slate-800 block">
+                              Penilaian Esai Guru
+                            </span>
+
+                            {/* Potongan Area Esai jika tersedia */}
+                            {selectedItem.scanResult?.essayAreaCropUrl && (
+                              <div className="space-y-1">
+                                <span className="text-[11px] text-slate-400">
+                                  Potongan Area Esai Lembar Jawaban:
+                                </span>
+                                <img
+                                  src={selectedItem.scanResult.essayAreaCropUrl}
+                                  alt="Area Esai"
+                                  className="w-full max-h-48 object-contain rounded-xl border border-slate-200 bg-white"
+                                />
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-1 gap-2">
+                              {examConfig.essayQuestions.map((eq) => {
+                                const currentMark = selectedItem.essayMarks?.find(
+                                  (m) => m.questionNumber === eq.number
+                                );
+                                const pointsAwarded = currentMark ? currentMark.pointsAwarded : 0;
+                                const outcome = currentMark ? currentMark.outcome : "INCORRECT";
+
+                                return (
+                                  <EssayMarkRow
+                                    key={eq.number}
+                                    questionNumber={eq.number}
+                                    maxScore={eq.maxScore ?? 10}
+                                    pointsAwarded={pointsAwarded}
+                                    outcome={outcome}
+                                    onChange={(pts, out) => {
+                                      const existing = selectedItem.essayMarks || [];
+                                      const updatedMarks = existing.filter((m) => m.questionNumber !== eq.number);
+                                      updatedMarks.push({
+                                        questionNumber: eq.number,
+                                        maxScore: eq.maxScore ?? 10,
+                                        outcome: out,
+                                        pointsAwarded: pts,
+                                      });
+                                      selectedItem.essayMarks = updatedMarks;
+                                      setItems([...items]);
+                                    }}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -831,12 +907,12 @@ export function DesktopBatchScan({ students, onSwitchToCamera }: DesktopBatchSca
                         return;
                       }
 
-                      const score = calculateScore(selectedItem.scanResult);
+                      const score = calculateScore(selectedItem.scanResult, selectedItem.essayMarks);
                       const scanPayload = selectedItem.scanResult || generateMockScan(selectedItem.filename, selectedIndex);
 
                       const gradeRecord: GradedStudentRecord = {
                         recordId: `rec-${selectedItem.id}-${Date.now()}`,
-                        examId: examConfig?.id || "exam-1",
+                        examId: examConfig?.id || "active_exam_config",
                         studentId: student.id,
                         studentName: student.name,
                         rawMCScore: score.scoringRes.mcPoints,

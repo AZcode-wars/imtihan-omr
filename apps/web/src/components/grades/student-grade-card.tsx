@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 export interface StudentGradeRecord {
   id: string;
+  studentId: string;
   nis: string;
   name: string;
   mcPoints: number;

@@ -8,10 +8,13 @@ import {
   clearQueue,
   addToQueue,
   getActiveExam,
+  saveGradeRecord,
+  getAllStudents,
 } from "@/lib/db";
 import { useSync } from "@/lib/sync-context";
-import { OfflineQueueItem } from "@/types/omr";
+import { GradedStudentRecord, OfflineQueueItem, OMRScanResponse } from "@/types/omr";
 import { buildTemplateFromExam } from "@/lib/template-builder";
+import { calculateFinalGrade, McQuestionResult, EssayMarkResult } from "@/lib/scoring";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -37,11 +40,17 @@ export default function QueuePage() {
   const [syncProgress, setSyncProgress] = React.useState<{ current: number; total: number } | null>(
     null
   );
+  const [activeExamTitle, setActiveExamTitle] = React.useState<string>("Ujian Aktif");
 
   const loadItems = React.useCallback(async () => {
     try {
-      const q = await getQueueItems();
+      const [q, exam] = await Promise.all([getQueueItems(), getActiveExam()]);
       setItems(q);
+      if (exam) {
+        const title = exam.title || "UTS Matematika";
+        const cls = exam.className ? `Kelas ${exam.className}` : "";
+        setActiveExamTitle(`${title} ${cls}`.trim());
+      }
       refreshQueueCount();
     } catch (err) {
       console.error("Gagal mengambil data antrean:", err);
@@ -93,7 +102,71 @@ export default function QueuePage() {
         }
       }
 
-      // Berhasil diproses oleh engine -> hapus dari antrean offline
+      const realData = await res.json();
+      const scanPayload: OMRScanResponse = {
+        ...realData,
+        fullWarpedImageUrl: realData.fullWarpedImageUrl || item.imageDataUrl,
+      };
+
+      // Hitung skor lembar ini berdasarkan kunci ujian aktif
+      const mcConfig = activeExam?.multipleChoiceQuestions || [];
+      const essayConfig = activeExam?.essayQuestions || [];
+
+      const mcQuestions: McQuestionResult[] = mcConfig.map((q) => {
+        const ans = scanPayload.mcAnswers?.find((a) => a.questionNumber === q.number);
+        const selectedOption = ans && ans.status === "VALID" ? ans.selectedOption : null;
+        return {
+          number: q.number,
+          correctAnswer: q.correctAnswer,
+          selectedOption: (selectedOption as any) || null,
+          pointsCorrect: q.pointsCorrect ?? 1,
+          pointsWrong: q.pointsWrong ?? 0,
+          status: q.status ?? "ACTIVE",
+        };
+      });
+
+      const essayQuestions: EssayMarkResult[] = essayConfig.map((eq) => ({
+        number: eq.number,
+        maxScore: eq.maxScore ?? 10,
+        outcome: "INCORRECT", // Default 0 jika disinkronkan langsung dari background
+      }));
+
+      const scoringRes = calculateFinalGrade({
+        mode: activeExam?.scoringMode ?? "MODE_A_PERCENTAGE",
+        rounding: activeExam?.rounding ?? "ROUND_HALF_UP",
+        mcQuestions,
+        essayQuestions,
+        weights: activeExam?.sectionWeights,
+      });
+
+      // Cari nama siswa jika ada roster yang terdaftar
+      const allStudents = await getAllStudents();
+      const matchedStudent = allStudents[0];
+      const studentId = matchedStudent?.id || `std-${Date.now()}`;
+      const studentName = matchedStudent?.name || "Siswa Belum Teridentifikasi";
+
+      const recordId = `rec-${item.id.replace(/^queue-/, "")}`;
+      const examId = item.examId || activeExam?.id || "active_exam_config";
+
+      const gradeRecord: GradedStudentRecord = {
+        recordId,
+        examId,
+        studentId,
+        studentName,
+        rawMCScore: scoringRes.mcPoints,
+        maxMCScore: scoringRes.mcMaxPoints,
+        rawEssayScore: scoringRes.essayPoints,
+        maxEssayScore: scoringRes.essayMaxPoints,
+        finalGrade: scoringRes.finalGrade,
+        totalPossiblePoints: scoringRes.totalPossiblePoints,
+        verifiedAt: new Date().toISOString(),
+        scanPayload,
+      };
+
+      // Simpan record nilai SEBELUM menghapus item antrean
+      await saveGradeRecord(gradeRecord);
+
+      // Berhasil diproses dan tersimpan -> hapus dari antrean offline
       await deleteQueueItem(item.id);
       return { ok: true };
     } catch (err: any) {
@@ -136,7 +209,7 @@ export default function QueuePage() {
     setSyncProgress(null);
 
     if (successCount > 0) {
-      toast.success(`${successCount} hasil scan tersinkron ke server.`);
+      toast.success(`${successCount} hasil scan berhasil diproses dan disimpan ke rekap.`);
     } else {
       toast.error(lastError || "Semua antrean gagal disinkronkan. Periksa format citra atau status Engine OMR.");
     }
@@ -262,7 +335,9 @@ export default function QueuePage() {
             <div>
               <p className="text-sm font-bold text-slate-800">
                 {isOnline
-                  ? `${items.length} lembar siap diunggah ke OMR Engine`
+                  ? pendingCount > 0
+                    ? `${pendingCount} lembar siap diunggah ke OMR Engine`
+                    : "Semua lembar selesai diproses"
                   : "Menunggu koneksi internet / engine untuk sinkronisasi"}
               </p>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -362,7 +437,11 @@ export default function QueuePage() {
                       <Clock className="w-3.5 h-3.5" />
                       <span>{timeStr}</span>
                       <span>·</span>
-                      <span className="truncate">{item.examId || "Ujian Reguler"}</span>
+                      <span className="truncate">
+                        {item.examId && item.examId !== "active_exam_config"
+                          ? item.examId
+                          : activeExamTitle}
+                      </span>
                     </div>
 
                     {item.lastError && (

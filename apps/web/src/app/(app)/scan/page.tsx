@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 
 export default function ScanPage() {
   const router = useRouter();
-  const { isOnline, refreshQueueCount } = useSync();
+  const { isOnline, refreshQueueCount, toggleSimulationOnline } = useSync();
   // State escape hatch jika pengguna ingin beralih manual (misal tablet)
   const [deviceOverride, setDeviceOverride] = React.useState<"auto" | "camera" | "batch">("auto");
   // Defaultkan true saat inisialisasi awal di browser desktop agar kamera tidak langsung diminta
@@ -220,7 +220,7 @@ export default function ScanPage() {
   };
 
   // Handler Trigger Capture LJK Riil (KRT-02)
-  const handleCapture = async (imageDataUrl: string) => {
+  const handleCapture = async (imageDataUrl: string, skipQueue = false) => {
     if (!imageDataUrl) {
       toast.error("Tidak ada citra LJK untuk dipindai.");
       return;
@@ -232,15 +232,19 @@ export default function ScanPage() {
     }
 
     try {
-      // Jika sedang offline, masukkan langsung ke antrean IndexedDB
+      // Jika sedang offline, masukkan langsung ke antrean IndexedDB dan early return (SED2-02)
       if (!isOnline) {
-        await addToQueue({
-          examId: examConfig?.id || "exam-uts-mat-8a",
-          thumbnailDataUrl: imageDataUrl,
-          imageDataUrl,
-        });
-        await refreshQueueCount();
-        toast.info("Offline: Foto scan disimpan di Antrean IndexedDB.");
+        if (!skipQueue) {
+          await addToQueue({
+            examId: examConfig?.id || "active_exam_config",
+            thumbnailDataUrl: imageDataUrl,
+            imageDataUrl,
+          });
+          await refreshQueueCount();
+        }
+        toast.info("Mode Offline: Foto scan disimpan di Antrean IndexedDB untuk disinkronkan nanti.");
+        setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
+        return;
       }
 
       // Bangun metadata template dinamis dari ujian aktif
@@ -341,7 +345,7 @@ export default function ScanPage() {
         // Jika offline, simpan otomatis ke IndexedDB
         if (!isOnline) {
           await addToQueue({
-            examId: examConfig?.id || "exam-uts-mat-8a",
+            examId: examConfig?.id || "active_exam_config",
             thumbnailDataUrl: dataUrl,
             imageDataUrl: dataUrl,
           });
@@ -351,12 +355,17 @@ export default function ScanPage() {
       }
     }
 
+    if (!isOnline) {
+      await refreshQueueCount();
+      toast.success(`${processedDataUrls.length} foto disimpan ke Antrean Offline.`);
+      return;
+    }
+
     if (processedDataUrls.length > 0) {
       setPendingMobileFiles(processedDataUrls);
       setCurrentFileIndex(0);
-      handleCapture(processedDataUrls[0]);
+      await handleCapture(processedDataUrls[0], true);
       await refreshQueueCount();
-      toast.success(`${processedDataUrls.length} lembar siap diverifikasi`);
     }
   };
 
@@ -366,7 +375,7 @@ export default function ScanPage() {
     try {
       const gradeRecord: GradedStudentRecord = {
         recordId: record.recordId || `rec-${Date.now()}`,
-        examId: record.examId || examConfig?.id || "exam-1",
+        examId: examConfig?.id || record.examId || "active_exam_config",
         studentId: record.studentId,
         studentName: record.studentName,
         rawMCScore: record.rawMCScore,
@@ -401,6 +410,7 @@ export default function ScanPage() {
 
   return (
     <div className="space-y-4">
+      <h1 className="sr-only">Scan LJK</h1>
       {/* 1. JIKA MODE DESKTOP BATCH */}
       {activeMode === "batch" ? (
         <div className="space-y-3">
@@ -465,10 +475,33 @@ export default function ScanPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Toggle Online / Offline Terintegrasi di Overlay Kamera Mobile */}
+              <button
+                type="button"
+                onClick={toggleSimulationOnline}
+                title="Klik untuk simulasi mode online/offline"
+                aria-label={isOnline ? "Status: Online (Klik untuk beralih offline)" : "Status: Offline (Klik untuk beralih online)"}
+                className={cn(
+                  "min-h-[44px] px-3 rounded-full flex items-center gap-1.5 backdrop-blur-md border text-xs font-semibold cursor-pointer transition-colors",
+                  isOnline
+                    ? "bg-black/60 text-white border-white/20 hover:bg-black/80"
+                    : "bg-amber-500/90 text-slate-950 border-amber-300 font-bold shadow-md"
+                )}
+              >
+                <span
+                  className={cn(
+                    "w-2 h-2 rounded-full",
+                    isOnline ? "bg-emerald-400 animate-pulse" : "bg-slate-950"
+                  )}
+                />
+                <span>{isOnline ? "Online" : "Offline"}</span>
+              </button>
+
               {/* Tombol Upload Batch File LJK */}
               <label
-                className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-white/90 flex items-center justify-center hover:bg-black/80 transition-colors cursor-pointer"
+                className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-white/90 flex items-center justify-center hover:bg-black/80 transition-colors cursor-pointer"
                 title="Unggah Foto LJK dari Galeri"
+                aria-label="Unggah Foto LJK dari Galeri"
               >
                 <Upload className="w-4 h-4 text-brand-300" />
                 <input
@@ -485,7 +518,7 @@ export default function ScanPage() {
                 type="button"
                 onClick={() => setTorchOn((t) => !t)}
                 className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center transition-colors cursor-pointer backdrop-blur-md border",
+                  "w-11 h-11 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center transition-colors cursor-pointer backdrop-blur-md border",
                   torchOn
                     ? "bg-amber-400 text-slate-950 border-amber-300 shadow-lg"
                     : "bg-black/60 text-white/80 border-white/15 hover:bg-black/80"

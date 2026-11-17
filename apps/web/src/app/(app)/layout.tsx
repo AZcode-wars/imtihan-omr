@@ -5,9 +5,29 @@ import { AppHeader } from "@/components/app-header";
 import { BottomNav } from "@/components/bottom-nav";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { SyncProvider, useSync } from "@/lib/sync-context";
+import { getActiveExam } from "@/lib/db";
+import { usePathname } from "next/navigation";
 
 function AppLayoutInner({ children }: { children: React.ReactNode }) {
   const { isOnline, queueCount, toggleSimulationOnline } = useSync();
+  const pathname = usePathname();
+  const [examLabel, setExamLabel] = React.useState<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    async function loadActiveExam() {
+      try {
+        const active = await getActiveExam();
+        if (active) {
+          const title = active.title || "UTS Matematika";
+          const className = active.className ? `Kelas ${active.className}` : "";
+          setExamLabel(`${title} ${className}`.trim());
+        }
+      } catch (err) {
+        console.warn("Gagal memuat info ujian aktif di layout:", err);
+      }
+    }
+    loadActiveExam();
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -19,6 +39,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         {/* Mobile Header (< 1024px) */}
         <div className="lg:hidden">
           <AppHeader
+            examTitle={examLabel}
             isOnline={isOnline}
             onToggleOnline={toggleSimulationOnline}
           />
