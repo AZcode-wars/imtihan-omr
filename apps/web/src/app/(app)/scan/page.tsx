@@ -600,21 +600,8 @@ export default function ScanPage() {
           {/* Action Bar Bawah Mengambang (Tidak Pernah Tenggelam, Tanpa Scroll) */}
           <div className="relative z-20 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-4 pb-[max(18px,env(safe-area-inset-bottom))] flex flex-col items-center gap-2">
             <div className="flex items-center justify-center gap-6 w-full max-w-xs">
-              {/* Tombol Akses Cepat Galeri */}
-              <label
-                className="w-13 h-13 min-h-[52px] min-w-[52px] rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white flex flex-col items-center justify-center hover:bg-black/80 active:scale-95 transition-all cursor-pointer shadow-md group"
-                title="Pilih Foto LJK dari Galeri"
-                aria-label="Pilih Foto LJK dari Galeri"
-              >
-                <ImagePlus className="w-5 h-5 text-white/90 group-hover:text-brand-300 group-hover:scale-110 transition-transform" />
-                <span className="text-[9px] font-semibold text-white/70 mt-0.5 leading-none">Galeri</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleGalleryUpload}
-                  className="hidden"
-                />
-              </label>
+              {/* Spacer penyeimbang sisi kiri agar tombol Shutter tepat di tengah */}
+              <div className="w-13 min-w-[52px] pointer-events-none" />
 
               {/* Tombol Rana Shutter Kamera */}
               <ShutterButton
@@ -623,8 +610,20 @@ export default function ScanPage() {
                 onClick={handleShutterClick}
               />
 
-              {/* Spacer penyeimbang sisi kanan agar tombol Shutter tepat di tengah */}
-              <div className="w-13 min-w-[52px] pointer-events-none" />
+              {/* Tombol Akses Cepat Galeri di Sebelah Kanan */}
+              <label
+                className="w-13 h-13 min-h-[52px] min-w-[52px] rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-black/80 active:scale-95 transition-all cursor-pointer shadow-md group"
+                title="Pilih Foto LJK dari Galeri"
+                aria-label="Pilih Foto LJK dari Galeri"
+              >
+                <ImagePlus className="w-6 h-6 text-white/90 group-hover:text-brand-300 group-hover:scale-110 transition-transform" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleGalleryUpload}
+                  className="hidden"
+                />
+              </label>
             </div>
 
             <p className="text-[11px] text-slate-400 text-center max-w-xs leading-relaxed">
