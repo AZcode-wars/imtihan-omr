@@ -41,10 +41,10 @@ import {
   FileCheck2,
   Flashlight,
   Globe,
+  ImagePlus,
   Info,
   Loader2,
   RefreshCw,
-  Upload,
   X,
   Zap,
 } from "lucide-react";
@@ -98,9 +98,7 @@ export default function ScanPage() {
   const totalStudents = students.length;
   const activePgCount = examConfig?.multipleChoiceQuestions?.length ?? 30;
 
-  // Batch mobile upload queue
-  const [pendingMobileFiles, setPendingMobileFiles] = React.useState<string[]>([]);
-  const [currentFileIndex, setCurrentFileIndex] = React.useState<number>(0);
+
 
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = React.useRef<MediaStream | null>(null);
@@ -324,53 +322,33 @@ export default function ScanPage() {
     handleCapture(frame);
   };
 
-  // Handler Multi-Upload Mobile dengan Resize & Antrean
-  const handleMobileBatchUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // Handler Unggah Foto Tunggal dari Galeri Mobile
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    toast.info(`Memproses ${files.length} foto LJK...`);
+    try {
+      setScanState("PROCESSING");
+      toast.info("Membaca foto LJK dari galeri...");
 
-    const processedDataUrls: string[] = [];
+      const { dataUrl } = await resizeImageFile(file, {
+        maxWidth: 1800,
+        maxHeight: 2400,
+        quality: 0.85,
+      });
 
-    // Baca dan resize satu demi satu untuk mencegah crash RAM
-    for (let i = 0; i < files.length; i++) {
-      try {
-        const { dataUrl } = await resizeImageFile(files[i], {
-          maxWidth: 1800,
-          maxHeight: 2400,
-          quality: 0.82,
-        });
-        processedDataUrls.push(dataUrl);
-
-        // Jika offline, simpan otomatis ke IndexedDB
-        if (!isOnline) {
-          await addToQueue({
-            examId: examConfig?.id || "active_exam_config",
-            thumbnailDataUrl: dataUrl,
-            imageDataUrl: dataUrl,
-          });
-        }
-      } catch (err) {
-        console.warn("Gagal me-resize foto:", err);
-      }
-    }
-
-    if (!isOnline) {
-      await refreshQueueCount();
-      toast.success(`${processedDataUrls.length} foto disimpan ke Antrean Offline.`);
-      return;
-    }
-
-    if (processedDataUrls.length > 0) {
-      setPendingMobileFiles(processedDataUrls);
-      setCurrentFileIndex(0);
-      await handleCapture(processedDataUrls[0], true);
-      await refreshQueueCount();
+      await handleCapture(dataUrl, true);
+    } catch (err: any) {
+      console.error("Gagal memproses foto galeri:", err);
+      toast.error(err?.message || "Gagal memproses foto LJK dari galeri.");
+      setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
+    } finally {
+      // Reset value agar pengguna dapat memilih file yang sama atau baru berulang kali
+      e.target.value = "";
     }
   };
 
-  // Simpan hasil verifikasi & lanjut lembar berikutnya jika batch
+  // Simpan hasil verifikasi & selesai
   const handleSaveVerify = async (record: any) => {
     // Cek duplikasi di IndexedDB (rekap atau antrean)
     const student = students.find((s) => s.id === record.studentId);
@@ -401,23 +379,16 @@ export default function ScanPage() {
       };
       await saveGradeRecord(gradeRecord);
       setSavedCount((c) => Math.min(totalStudents, c + 1));
+      toast.success(`Nilai ${student?.name || "siswa"} berhasil disimpan.`);
     } catch (err) {
       console.error("Gagal menyimpan nilai:", err);
       toast.error("Gagal menyimpan nilai ke penyimpanan lokal.");
       return;
     }
 
-    // Jika masih ada sisa lembar dalam upload batch mobile
-    if (pendingMobileFiles.length > 0 && currentFileIndex < pendingMobileFiles.length - 1) {
-      const nextIdx = currentFileIndex + 1;
-      setCurrentFileIndex(nextIdx);
-      handleCapture(pendingMobileFiles[nextIdx]);
-      toast.success(`Menampilkan lembar ${nextIdx + 1} dari ${pendingMobileFiles.length}`);
-    } else {
-      setPendingMobileFiles([]);
-      setScanResult(null);
-      setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
-    }
+    // Reset dan kembali siap scan/unggah lembar berikutnya
+    setScanResult(null);
+    setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
   };
 
   return (
@@ -509,18 +480,17 @@ export default function ScanPage() {
                 )}
               </div>
 
-              {/* Tombol Upload Batch File LJK */}
+              {/* Tombol Upload File LJK dari Galeri */}
               <label
                 className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-white/90 flex items-center justify-center hover:bg-black/80 transition-colors cursor-pointer"
-                title="Unggah Foto LJK dari Galeri"
-                aria-label="Unggah Foto LJK dari Galeri"
+                title="Pilih Foto LJK dari Galeri"
+                aria-label="Pilih Foto LJK dari Galeri"
               >
-                <Upload className="w-4 h-4 text-brand-300" />
+                <ImagePlus className="w-4 h-4 text-brand-300" />
                 <input
                   type="file"
-                  multiple
                   accept="image/*"
-                  onChange={handleMobileBatchUpload}
+                  onChange={handleGalleryUpload}
                   className="hidden"
                 />
               </label>
@@ -555,11 +525,7 @@ export default function ScanPage() {
               {scanState === "PROCESSING" ? (
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-950/90 border border-brand-400/40 text-brand-300 text-xs font-semibold backdrop-blur-md animate-pulse">
                   <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
-                  <span>
-                    {pendingMobileFiles.length > 0
-                      ? `Memproses Lembar ${currentFileIndex + 1} dari ${pendingMobileFiles.length}...`
-                      : "Memproses Pembacaan LJK..."}
-                  </span>
+                  <span>Memproses Pembacaan LJK...</span>
                 </div>
               ) : cameraStatus === "DENIED" || cameraStatus === "UNAVAILABLE" ? (
                 <div className="flex flex-col items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900/90 border border-rose-500/40 text-slate-200 text-xs backdrop-blur-md shadow-lg text-center max-w-xs">
@@ -572,17 +538,29 @@ export default function ScanPage() {
                       ? "Izin akses kamera ditolak di browser. Silakan beri izin atau gunakan tombol 'Pilih Foto LJK'."
                       : "Perangkat kamera tidak ditemukan di peramban ini."}
                   </p>
-                  {cameraStatus === "DENIED" && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={startCamera}
-                      className="mt-1 text-xs h-7 gap-1"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      <span>Coba Lagi</span>
-                    </Button>
-                  )}
+                  <div className="flex items-center justify-center gap-2 mt-1 flex-wrap">
+                    {cameraStatus === "DENIED" && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={startCamera}
+                        className="text-xs h-8 gap-1"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Coba Lagi</span>
+                      </Button>
+                    )}
+                    <label className="inline-flex items-center justify-center rounded-md text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white h-8 px-3 gap-1.5 cursor-pointer shadow-sm transition-colors">
+                      <ImagePlus className="w-3.5 h-3.5" />
+                      <span>Pilih Foto LJK</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleGalleryUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                 </div>
               ) : cameraStatus === "REQUESTING" ? (
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-700 text-slate-300 text-xs font-medium backdrop-blur-md">
@@ -617,27 +595,40 @@ export default function ScanPage() {
                 </div>
               )}
             </div>
-
-            {/* Escape Hatch kecil untuk beralih ke Desktop Batch jika di tablet */}
-            <button
-              type="button"
-              onClick={() => setDeviceOverride("batch")}
-              className="mt-3 text-[11px] text-white/50 hover:text-white/90 underline transition-colors cursor-pointer"
-            >
-              Beralih ke mode batch review tabel
-            </button>
           </div>
 
           {/* Action Bar Bawah Mengambang (Tidak Pernah Tenggelam, Tanpa Scroll) */}
           <div className="relative z-20 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-4 pb-[max(18px,env(safe-area-inset-bottom))] flex flex-col items-center gap-2">
-            <ShutterButton
-              isLocked={scanState === "LOCKED" && cameraStatus === "ACTIVE"}
-              disabled={scanState === "PROCESSING" || cameraStatus !== "ACTIVE"}
-              onClick={handleShutterClick}
-            />
+            <div className="flex items-center justify-center gap-6 w-full max-w-xs">
+              {/* Tombol Akses Cepat Galeri */}
+              <label
+                className="w-13 h-13 min-h-[52px] min-w-[52px] rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white flex flex-col items-center justify-center hover:bg-black/80 active:scale-95 transition-all cursor-pointer shadow-md group"
+                title="Pilih Foto LJK dari Galeri"
+                aria-label="Pilih Foto LJK dari Galeri"
+              >
+                <ImagePlus className="w-5 h-5 text-white/90 group-hover:text-brand-300 group-hover:scale-110 transition-transform" />
+                <span className="text-[9px] font-semibold text-white/70 mt-0.5 leading-none">Galeri</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleGalleryUpload}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Tombol Rana Shutter Kamera */}
+              <ShutterButton
+                isLocked={scanState === "LOCKED" && cameraStatus === "ACTIVE"}
+                disabled={scanState === "PROCESSING" || cameraStatus !== "ACTIVE"}
+                onClick={handleShutterClick}
+              />
+
+              {/* Spacer penyeimbang sisi kanan agar tombol Shutter tepat di tengah */}
+              <div className="w-13 min-w-[52px] pointer-events-none" />
+            </div>
 
             <p className="text-[11px] text-slate-400 text-center max-w-xs leading-relaxed">
-              Pastikan 4 sudut lembar masuk dalam bingkai, lalu ketuk tombol lingkaran untuk memotret.
+              Pastikan 4 sudut lembar masuk dalam bingkai, atau pilih foto dari galeri.
             </p>
           </div>
 
@@ -647,7 +638,6 @@ export default function ScanPage() {
               scanResult={scanResult}
               students={students}
               onClose={() => {
-                setPendingMobileFiles([]);
                 setScanResult(null);
                 setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
               }}
@@ -673,15 +663,8 @@ export default function ScanPage() {
                   toast.error("Gagal menyimpan ke antrean lokal.");
                 }
 
-                if (pendingMobileFiles.length > 0 && currentFileIndex < pendingMobileFiles.length - 1) {
-                  const nextIdx = currentFileIndex + 1;
-                  setCurrentFileIndex(nextIdx);
-                  handleCapture(pendingMobileFiles[nextIdx]);
-                } else {
-                  setPendingMobileFiles([]);
-                  setScanResult(null);
-                  setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
-                }
+                setScanResult(null);
+                setScanState(cameraStatus === "ACTIVE" ? "LOCKED" : "IDLE");
               }}
             />
           )}
